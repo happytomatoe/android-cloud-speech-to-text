@@ -1,0 +1,5 @@
+# Test audio fixtures (large binary files, not committed)
+/test-sources/
+test-sources/*.wav
+test-sources/*.mp3
+test-sources/*.ogg
