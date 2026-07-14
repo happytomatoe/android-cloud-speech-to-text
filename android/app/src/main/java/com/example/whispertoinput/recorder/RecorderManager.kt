@@ -41,20 +41,45 @@ class RecorderManager(context: Context) {
     companion object {
         fun requiredPermissions() = arrayOf(
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.POST_NOTIFICATIONS
         )
+    }
+
+    // Recorder FSM States
+    enum class RecorderState {
+        Idle,      // Recording started, waiting for speech
+        Speaking,  // Speech detected, actively recording
+        Finish,    // End of speech detected, ready to transcribe
+        Cancelled  // No speech detected within timeout, cancelled
     }
 
     private var recorder: MediaRecorder? = null
     private var onUpdateMicrophoneAmplitude: (Int) -> Unit = { }
+    private var onRecorderStateChange: (RecorderState) -> Unit = { }
     private var microphoneAmplitudeUpdateJob: Job? = null
     private val amplitudeReportPeriod: Long
     private val context: Context
 
+    // FSM state
+    private var currentState: RecorderState = RecorderState.Idle
+    private var silenceDurationMs: Long = 0
+    private var idleDurationMs: Long = 0
+
+    // Thresholds from resources
+    private val idleSpeakingThreshold: Int
+    private val idleCancelThreshold: Int
+    private val idleCancelTimeMs: Long
+    private val speakingFinishThreshold: Int
+    private val speakingFinishTimeMs: Long
+
     init {
         this.context = context
-        this.amplitudeReportPeriod =
-            context.resources.getInteger(R.integer.recorder_amplitude_report_period).toLong()
+        this.amplitudeReportPeriod = context.resources.getInteger(R.integer.recorder_amplitude_report_period).toLong()
+        this.idleSpeakingThreshold = context.resources.getInteger(R.integer.recorder_fsm_idle_speaking_threshold)
+        this.idleCancelThreshold = context.resources.getInteger(R.integer.recorder_fsm_idle_cancel_threshold)
+        this.idleCancelTimeMs = context.resources.getInteger(R.integer.recorder_fsm_idle_cancel_time).toLong()
+        this.speakingFinishThreshold = context.resources.getInteger(R.integer.recorder_fsm_speaking_finish_threshold)
+        this.speakingFinishTimeMs = context.resources.getInteger(R.integer.recorder_fsm_speaking_finish_time).toLong()
     }
 
     fun start(context: Context, filename: String, useOggFormat: Boolean = false) {
@@ -100,15 +125,64 @@ class RecorderManager(context: Context) {
             start()
         }
 
-        // Start a job to periodically report current amplitude
+        // Reset FSM state
+        currentState = RecorderState.Idle
+        silenceDurationMs = 0
+        idleDurationMs = 0
+        notifyStateChange()
+
+        // Start a job to periodically report current amplitude and run FSM
         microphoneAmplitudeUpdateJob?.cancel()
         microphoneAmplitudeUpdateJob = CoroutineScope(Dispatchers.Main).launch {
             while (recorder != null) {
                 val amplitude = recorder?.maxAmplitude ?: 0
                 onUpdateMicrophoneAmplitude(amplitude)
+                updateFsm(amplitude)
                 delay(amplitudeReportPeriod)
             }
         }
+    }
+
+    private fun updateFsm(amplitude: Int) {
+        when (currentState) {
+            RecorderState.Idle -> {
+                if (amplitude > idleSpeakingThreshold) {
+                    // Speech detected -> transition to Speaking
+                    currentState = RecorderState.Speaking
+                    silenceDurationMs = 0
+                    notifyStateChange()
+                } else {
+                    // Still idle, accumulate idle time
+                    idleDurationMs += amplitudeReportPeriod
+                    if (idleDurationMs >= idleCancelTimeMs) {
+                        // No speech for too long -> cancel
+                        currentState = RecorderState.Cancelled
+                        notifyStateChange()
+                    }
+                }
+            }
+            RecorderState.Speaking -> {
+                if (amplitude <= speakingFinishThreshold) {
+                    // Silence detected, accumulate silence duration
+                    silenceDurationMs += amplitudeReportPeriod
+                    if (silenceDurationMs >= speakingFinishTimeMs) {
+                        // End of speech detected -> transition to Finish
+                        currentState = RecorderState.Finish
+                        notifyStateChange()
+                    }
+                } else {
+                    // Speech continues, reset silence counter
+                    silenceDurationMs = 0
+                }
+            }
+            RecorderState.Finish, RecorderState.Cancelled -> {
+                // Terminal states, do nothing
+            }
+        }
+    }
+
+    private fun notifyStateChange() {
+        onRecorderStateChange(currentState)
     }
 
     fun stop() {
@@ -125,6 +199,15 @@ class RecorderManager(context: Context) {
     // Assign onUpdateMicrophoneAmplitude callback
     fun setOnUpdateMicrophoneAmplitude(onUpdateMicrophoneAmplitude: (Int) -> Unit) {
         this.onUpdateMicrophoneAmplitude = onUpdateMicrophoneAmplitude
+    }
+
+    // Assign onRecorderStateChange callback
+    fun setOnRecorderStateChange(onRecorderStateChange: (RecorderState) -> Unit) {
+        this.onRecorderStateChange = onRecorderStateChange
+    }
+
+    fun getCurrentState(): RecorderState {
+        return currentState
     }
 
     // Returns whether all of the permissions are granted.
