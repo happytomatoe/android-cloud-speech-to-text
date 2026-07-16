@@ -33,24 +33,27 @@
 set -euxo pipefail
 
 # Write all output (incl. `set -x` trace) to a log file and mirror it to the console.
-LOG_FILE="e2e_test.log"
-exec > >(tee "$LOG_FILE") 2>&1
-
 # =============================================================================
-# Configuration
+# Configuration (all overridable via environment variables)
 # =============================================================================
 
 ADB="/var/home/l/Android/Sdk/platform-tools/adb"
 EMULATOR="/var/home/l/Android/Sdk/emulator/emulator"
-AVD="Pixel_8"
+AVD="${AVD:-Pixel_8}"
 PACKAGE="com.example.whispertoinput"
 SERVICE="com.example.whispertoinput/.WhisperInputService"
 LATIN_IME="com.android.inputmethod.latin/.LatinIME"
 WAV_FILE="/tmp/test-speech-loud.wav"
-VIRTUAL_SINK="VirtualMicSink"
-FAKE_MIC="FakeMic"
-SERIAL="emulator-5554"
+VIRTUAL_SINK="${VIRTUAL_SINK:-VirtualMicSink}"
+FAKE_MIC="${FAKE_MIC:-FakeMic}"
+SILENT_SINK="${SILENT_SINK:-SilentTestSink}"
+SERIAL="${SERIAL:-emulator-5554}"
+PID_FILE="${PID_FILE:-/tmp/emulator.pid}"
+EMU_LOG="${EMU_LOG:-/tmp/emulator.log}"
+LOG_FILE="${LOG_FILE:-e2e_test.log}"
 EMULATOR_WAS_RUNNING=false
+
+exec > >(tee "$LOG_FILE") 2>&1
 
 # Default API keys (sourced from keyring / prior sessions)
 DEEPGRAM_KEY_DEFAULT="f97f6e1e42b697792bfe1867f7679fdeaace4de8"
@@ -98,6 +101,20 @@ log_ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_err()  { echo -e "${RED}[ERR]${NC} $*"; }
 
+wait_for() {
+    local desc="$1" timeout_s="$2" predicate="$3"
+    local start s
+    start=$(date +%s)
+    while (( $(date +%s) - start < timeout_s )); do
+        if eval "$predicate" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    log_warn "wait_for timed out: $desc"
+    return 1
+}
+
 die() { log_err "$*"; exit 1; }
 
 run_cmd() {
@@ -130,7 +147,7 @@ setup_virtual_mic() {
     # Check if already exist
     if pactl list short sources | grep -q "$FAKE_MIC" && \
        pactl list short sinks | grep -q "$VIRTUAL_SINK" && \
-       pactl list short sinks | grep -q "SilentTestSink"; then
+       pactl list short sinks | grep -q "$SILENT_SINK"; then
         log_ok "Virtual mic sources already exist"
         return 0
     fi
@@ -143,17 +160,19 @@ setup_virtual_mic() {
 
     # Create SilentTestSink for test audio playback — completely silent on speakers.
     # Audio is loopbacked into VirtualMicSink so QEMU captures it as mic input.
-    run_cmd "pactl load-module module-null-sink sink_name=SilentTestSink sink_properties=device.description=SilentTestSink"
-    run_cmd "pactl load-module module-loopback source=SilentTestSink.monitor sink=$VIRTUAL_SINK"
+    run_cmd "pactl load-module module-null-sink sink_name=$SILENT_SINK sink_properties=device.description=$SILENT_SINK"
+    run_cmd "pactl load-module module-loopback source=$SILENT_SINK.monitor sink=$VIRTUAL_SINK"
 
-    sleep 1
+    wait_for "Virtual mic sinks" 5 "pactl list short sinks | grep -q $VIRTUAL_SINK"
+    wait_for "FakeMic source" 5 "pactl list short sources | grep -q $FAKE_MIC"
+    wait_for "SilentTestSink" 5 "pactl list short sinks | grep -q $SILENT_SINK"
     log_ok "Virtual mic sources created (with silent test sink)"
 }
 
 cleanup_virtual_mic() {
     log_info "Cleaning up virtual mic modules..."
     # Unload each matching module individually (grep may return multiple IDs)
-    for pattern in "$VIRTUAL_SINK" "$FAKE_MIC" "SilentTestSink" "module-loopback"; do
+    for pattern in "$VIRTUAL_SINK" "$FAKE_MIC" "$SILENT_SINK" "module-loopback"; do
         pactl list short modules | grep "$pattern" | awk '{print $1}' | while read -r mid; do
             pactl unload-module "$mid" 2>/dev/null || true
         done
@@ -188,13 +207,25 @@ generate_test_audio() {
 # Emulator Management
 # =============================================================================
 
+wait_for_emulator_offline() {
+    local start s
+    start=$(date +%s)
+    while (( $(date +%s) - start < 15 )); do
+        if [[ "$("$ADB" -s "$SERIAL" get-state 2>/dev/null)" != "device" ]]; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+
 start_emulator() {
     # Check if emulator is already running with FakeMic pinned
     if "$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && \
        [[ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null)" == "1" ]]; then
         # Verify FakeMic is pinned (check QEMU env in /proc)
         local qemu_pid
-        qemu_pid=$(pgrep -f "qemu-system.*Pixel_8" | head -1)
+        qemu_pid=$(pgrep -f "qemu-system.*${AVD}" | head -1)
         if [[ -n "$qemu_pid" ]] && \
            grep -q "QEMU_PA_SOURCE=$FAKE_MIC" "/proc/$qemu_pid/environ" 2>/dev/null; then
             EMULATOR_WAS_RUNNING=true
@@ -203,9 +234,9 @@ start_emulator() {
         fi
         log_warn "Emulator running but FakeMic NOT pinned — restarting..."
         "$ADB" -s "$SERIAL" emu kill 2>/dev/null || true
-        sleep-i-am-sure 3
-        pkill -9 -f "qemu-system.*Pixel_8" 2>/dev/null || true
-        sleep-i-am-sure 2
+        wait_for_emulator_offline || true
+        pkill -9 -f "qemu-system.*${AVD}" 2>/dev/null || true
+        wait_for "emulator process death" 10 "[[ -z \"\$(pgrep -f 'qemu-system.*${AVD}')\" ]]"
     fi
 
     # Verify snapshot exists for quick boot
@@ -216,10 +247,8 @@ start_emulator() {
 
     log_info "Starting emulator with FakeMic pinned..."
 
-    # Kill any stale emulator processes before launching fresh
-
     # Clean up stale PID file
-    rm -f /tmp/emulator.pid /tmp/emulator.log
+    rm -f "$PID_FILE" "$EMU_LOG"
 
     # Launch emulator with FakeMic pinned
     local emu_flags="-gpu host -no-snapshot-save"
@@ -230,21 +259,13 @@ start_emulator() {
         emu_flags="$emu_flags -no-window"
     fi
     QEMU_AUDIO_DRV=pa QEMU_PA_SOURCE=$FAKE_MIC \
-    setsid "$EMULATOR" -avd "$AVD" $emu_flags > /tmp/emulator.log 2>&1 &
-    echo $! > /tmp/emulator.pid
+    setsid "$EMULATOR" -avd "$AVD" $emu_flags > "$EMU_LOG" 2>&1 &
+    echo $! > "$PID_FILE"
 
     log_info "Waiting for emulator boot..."
-    local i=0
-    while [[ $i -lt $EMULATOR_BOOT_TIMEOUT ]]; do
-        if "$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && \
-           [[ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null)" == "1" ]]; then
-            log_ok "Emulator booted"
-            return 0
-        fi
-        sleep 2
-        i=$((i + 2))
-    done
-    die "Emulator boot timeout after ${EMULATOR_BOOT_TIMEOUT}s"
+    wait_for "emulator boot" $EMULATOR_BOOT_TIMEOUT \
+        '"$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && "$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | grep -q "^1$"'
+    log_ok "Emulator booted"
 }
 
 disable_host_mic() {
@@ -261,19 +282,20 @@ stop_emulator() {
     # Graceful shutdown via adb (snapshot NOT saved — we use -no-snapshot-save)
     if "$ADB" -s "$SERIAL" get-state >/dev/null 2>&1; then
         "$ADB" -s "$SERIAL" emu kill 2>/dev/null || true
-        sleep-i-am-sure 5
+        # Poll for device to go offline instead of blind sleep
+        wait_for "emulator shutdown" 15 "[[ \"\$($ADB -s $SERIAL get-state 2>/dev/null)\" != 'device' ]]" || true
     fi
     # Clean up PID file
-    if [[ -f /tmp/emulator.pid ]]; then
+    if [[ -f "$PID_FILE" ]]; then
         local pid
-        pid=$(cat /tmp/emulator.pid)
+        pid=$(cat "$PID_FILE")
         if kill -0 "$pid" 2>/dev/null; then
             log_warn "Process still alive after adb emu kill, force killing..."
             kill "$pid" 2>/dev/null || true
         fi
-        rm -f /tmp/emulator.pid
+        rm -f "$PID_FILE"
     fi
-    rm -f /tmp/emulator.log
+    rm -f "$EMU_LOG"
     log_ok "Emulator stopped"
 }
 
@@ -597,10 +619,10 @@ focus_text_field() {
 }
 
 play_test_audio() {
-    log_info "Playing test audio into SilentTestSink (completely silent on speakers)..."
-    # SilentTestSink is a null sink with loopback -> VirtualMicSink -> FakeMic -> emulator mic.
+    log_info "Playing test audio into $SILENT_SINK (completely silent on speakers)..."
+    # $SILENT_SINK is a null sink with loopback -> VirtualMicSink -> FakeMic -> emulator mic.
     # Null sinks produce no speaker output; loopback routes audio into the mic path.
-    run_cmd "paplay --device=SilentTestSink $WAV_FILE"
+    run_cmd "paplay --device=$SILENT_SINK $WAV_FILE"
     log_ok "Audio played"
 }
 
@@ -678,8 +700,9 @@ run_e2e_test() {
     start_emulator
     disable_host_mic
 
-    # Let package manager and system services fully settle after boot
-    sleep 5
+    # Wait for package manager and system services to fully settle after boot
+    # (already confirmed via boot_completed, just need a small buffer for PM)
+    wait_for "package manager ready" 5 'adb_cmd shell pm list packages >/dev/null 2>&1'
 
     # 3. App
     clear_app_data
