@@ -29,20 +29,9 @@ jobs:
           restore-keys: |
             robolectric-sdk-
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
-        working-directory: android
-
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --parallel
         working-directory: android
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: whisper-to-input-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
 
       - name: Upload test reports
         if: always()
