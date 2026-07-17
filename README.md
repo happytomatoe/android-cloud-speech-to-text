@@ -13,8 +13,6 @@ Whisper To Input (輕聲細語輸入法) is an Android keyboard that performs sp
 | [Deepgram](https://developers.deepgram.com/reference/pre-recorded) | Cloud | ✅ |
 | [Groq](https://console.groq.com/docs/speech-to-text) | Cloud | ✅ |
 | [60db](https://docs.60db.ai/api-reference/introduction) | Cloud | ✅ |
-| [Whisper ASR Webservice](https://github.com/ahmetoner/whisper-asr-webservice) | Self-hosted | ❌ |
-| [NVIDIA NIM](https://build.nvidia.com/openai/whisper-large-v3) | Self-hosted | ✅ (NGC) |
 
 ## Installation
 
@@ -67,20 +65,15 @@ Model:      60db-stt-v01
 Language:   auto
 ```
 
-**Self-hosted Whisper ASR Webservice:**
-```
-Endpoint:   http://<server>:9000/asr
-API Key:
-Model:
-Language:
-```
-
 ## Keyboard Usage
 
 - **Microphone** (center): Tap to start/stop recording
-- **Backspace** (upper right): Delete previous character
-- **Enter** (bottom right): Newline (stops recording if active)
-- **Settings** (upper left): Open app settings
+- **Cancel** (left of mic): Cancel recording or transcription
+- **Retry** (left of mic, shown on error): Retry the last transcription
+- **Backspace** (right of mic): Delete previous character
+- **Enter** (right of backspace): Newline (stops recording if active)
+- **Space Bar** (bottom center): Insert space (stops recording if active)
+- **Settings** (upper right): Open app settings
 - **Switch** (upper left): Switch to previous input method
 
 ## Building
@@ -125,6 +118,7 @@ adb logcat *:E  # Errors only
 ## Permissions
 
 - `RECORD_AUDIO`: Required for voice input
+- `INTERNET`: Required for cloud API calls
 - `POST_NOTIFICATIONS`: Required for background error toasts
 
 ## License
