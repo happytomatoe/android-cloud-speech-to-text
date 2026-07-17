@@ -378,3 +378,4 @@ Main Contributors: Yan-Bin Diau ([@tigerpaws01](https://github.com/tigerpaws01))
 
 For a complete list of contributors to the code of this repository, please visit the [contributor list](https://github.com/j3soon/whisper-to-input/graphs/contributors).
 # Release v0.6.0
+# CI test
