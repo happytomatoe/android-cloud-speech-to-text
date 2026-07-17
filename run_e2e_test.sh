@@ -702,6 +702,46 @@ wait_for_transcription() {
 # Main Test Flow
 # =============================================================================
 
+# ── Negative-path checks ─────────────────────────────────────────
+# Read-only observers run during the happy-path E2E. They never change the
+# flow, so the happy path is unchanged. (The "cancel mid-transcribe returns to
+# Idle" guard lives at the unit level in WhisperKeyboardTest.cancel_transcribing_
+# cancels, since the IME's btn_cancel is not wired into WhisperInputService today.)
+
+STATUS_SEEN_RECORDING=false
+STATUS_SEEN_TRANSCRIBING=false
+
+# Current text of label_status if the IME keyboard is visible, else empty.
+sample_status_label() {
+    dump_ui 2>/dev/null | grep -oP 'resource-id="[^"]*label_status"[^>]*text="\K[^"]*' | head -1
+}
+
+# Sample the status label for up to TRANSCRIPTION_TIMEOUT seconds, recording
+# which states we observed (whisper_to_input -> recording -> transcribing).
+monitor_status_label() {
+    local start
+    start=$(date +%s)
+    while (( $(date +%s) - start < TRANSCRIPTION_TIMEOUT )); do
+        local s
+        s=$(sample_status_label)
+        if [[ "$s" == *"Recording"* ]]; then STATUS_SEEN_RECORDING=true; fi
+        if [[ "$s" == *"Transcribing"* ]]; then STATUS_SEEN_TRANSCRIBING=true; fi
+        sleep 0.5
+    done
+}
+
+# A start->transcribe cycle must commit exactly one "Transcription result:"
+# line — guards against a stray toggle double-committing.
+check_single_transcription_result() {
+    local count
+    count=$(adb_cmd logcat -d -s "whisper-input:V" 2>/dev/null | grep -c "Transcription result:")
+    if [[ "$count" -eq 1 ]]; then
+        log_ok "Single transcription result committed (double-tap guard OK)"
+    else
+        log_warn "Expected exactly 1 'Transcription result:' line, saw $count"
+    fi
+}
+
 run_e2e_test() {
     local backend="$1"
     local api_key="$2"
@@ -758,11 +798,17 @@ run_e2e_test() {
     focus_text_field          # Opens Settings search bar, keyboard appears
     step_timer "Focus text field"
 
+    # Negative-path: monitor the status label (whisper_to_input -> recording
+    # -> transcribing -> whisper_to_input) across the taps that follow.
+    monitor_status_label & MON_PID=$!
+
     # First tap: starts test-file mode (sets flag, no actual recording)
     tap_mic_button
     sleep 1
     step_timer "Test-file start"
 
+    # Reset logcat so the single-result guard counts only this run.
+    adb_cmd logcat -c
     # Second tap: stops and transcribes the test file
     tap_mic_button
     step_timer "Test-file transcribe"
@@ -770,6 +816,15 @@ run_e2e_test() {
     # 7. Wait for transcription
     wait_for_transcription "$3"
     step_timer "Transcription"
+
+    # Negative-path assertions (observational; do not alter the happy path).
+    wait "$MON_PID" 2>/dev/null || true
+    if [[ "$STATUS_SEEN_RECORDING" == "true" && "$STATUS_SEEN_TRANSCRIBING" == "true" ]]; then
+        log_ok "Status label cycled recording -> transcribing"
+    else
+        log_warn "Status label transition not fully observed (recording=$STATUS_SEEN_RECORDING transcribing=$STATUS_SEEN_TRANSCRIBING)"
+    fi
+    check_single_transcription_result
 
     log_ok "=== TEST PASSED: $backend ==="
     echo -e "${GREEN}[TIME]${NC} Total test time: $(( SECONDS - TEST_START ))s"
