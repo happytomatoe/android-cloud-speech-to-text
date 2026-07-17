@@ -83,29 +83,23 @@ echo "help" | nc localhost 5554
 The PulseAudio chain that makes this silent (implemented in `run_e2e_test.sh` as `setup_virtual_mic()` / `play_test_audio()`):
 
 ```
-SilentTestSink  ──(module-loopback)──▶  VirtualMicSink
-   (null sink,            monitor of VirtualMicSink
-    no speaker                                  │
-    output)                                     ▼
-                                         FakeMic (remap source)
-                                              │
-                                              ▼
-                                   QEMU_PA_SOURCE=FakeMic  ──▶  emulator mic
+VirtualMicSink  ──(monitor)──▶  FakeMic (remap source)
+   (null sink, no                  │
+    speaker output)                ▼
+                           QEMU_PA_SOURCE=FakeMic  ──▶  emulator mic
 ```
 
-- `SilentTestSink` is a **null sink**: it produces zero speaker output.
-- `module-loopback source=SilentTestSink.monitor sink=VirtualMicSink` feeds the test audio into the mic path.
+- `VirtualMicSink` is a **null sink**: it produces zero speaker output. Test audio is played directly into it.
+- `FakeMic` remaps `VirtualMicSink.monitor` into a source that QEMU uses as its mic input.
 - The emulator is launched pinned to the virtual mic: `QEMU_AUDIO_DRV=pa QEMU_PA_SOURCE=FakeMic`.
-- Play the WAV into the silent sink: `paplay --device=SilentTestSink /tmp/test-speech-loud.wav` — it is captured by the emulator mic but the user hears nothing.
+- Play the WAV into VirtualMicSink: `paplay --device=VirtualMicSink /tmp/test-speech-loud.wav` — it is captured by the emulator mic but the user hears nothing.
 
 Set it up once (idempotent — `setup_virtual_mic()` early-exits if the sinks already exist):
 
 ```bash
 pactl load-module module-null-sink sink_name=VirtualMicSink sink_properties=device.description=VirtualMicSink
 pactl load-module module-remap-source source_name=FakeMic master=VirtualMicSink.monitor source_properties=device.description=FakeMic
-pactl load-module module-null-sink sink_name=SilentTestSink sink_properties=device.description=SilentTestSink
-pactl load-module module-loopback source=SilentTestSink.monitor sink=VirtualMicSink
-paplay --device=SilentTestSink /tmp/test-speech-loud.wav   # silent on host, audible to emulator mic
+paplay --device=VirtualMicSink /tmp/test-speech-loud.wav   # silent on host, audible to emulator mic
 ```
 
 **Caveat — the emulator must be (re)started with the FakeMic pin.** `run_e2e_test.sh` only sets `QEMU_PA_SOURCE=FakeMic` when it *launches a new emulator*. If a pre-existing emulator is reused (`EMULATOR_WAS_RUNNING=true`), it won't have the virtual mic wired, so injection fails silently. When in doubt, stop the emulator so the script restarts it with the correct audio routing.

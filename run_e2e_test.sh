@@ -46,7 +46,6 @@ LATIN_IME="com.android.inputmethod.latin/.LatinIME"
 WAV_FILE="/tmp/test-speech-loud.wav"
 VIRTUAL_SINK="${VIRTUAL_SINK:-VirtualMicSink}"
 FAKE_MIC="${FAKE_MIC:-FakeMic}"
-SILENT_SINK="${SILENT_SINK:-SilentTestSink}"
 SERIAL="${SERIAL:-emulator-5554}"
 PID_FILE="${PID_FILE:-/tmp/emulator.pid}"
 EMU_LOG="${EMU_LOG:-/tmp/emulator.log}"
@@ -83,7 +82,6 @@ declare -A BACKEND_DISPLAY=(
 # Timeouts
 EMULATOR_BOOT_TIMEOUT=180
 TRANSCRIPTION_TIMEOUT=30
-RECORDING_DURATION=5
 
 # Colors for output
 RED='\033[0;31m'
@@ -91,6 +89,19 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# ── Step Timer ─────────────────────────────────────────────────────
+# Usage: STEP_START=$SECONDS at the top, then step_timer "label" after each phase.
+STEP_START=0
+TEST_START=0
+
+step_timer() {
+    local now=$SECONDS
+    local elapsed=$(( now - STEP_START ))
+    local total=$(( now - TEST_START ))
+    echo -e "${BLUE}[TIME]${NC} $1 completed in ${elapsed}s (total: ${total}s)"
+    STEP_START=$now
+}
 
 # =============================================================================
 # Helper Functions
@@ -146,33 +157,28 @@ setup_virtual_mic() {
 
     # Check if already exist
     if pactl list short sources | grep -q "$FAKE_MIC" && \
-       pactl list short sinks | grep -q "$VIRTUAL_SINK" && \
-       pactl list short sinks | grep -q "$SILENT_SINK"; then
+       pactl list short sinks | grep -q "$VIRTUAL_SINK"; then
         log_ok "Virtual mic sources already exist"
         return 0
     fi
 
-    # Create VirtualMicSink (null sink) — QEMU captures its monitor as mic input
+    # VirtualMicSink (null sink) — QEMU captures its monitor as mic input.
+    # We play test audio directly into this sink; being a null sink it
+    # produces zero speaker output, so the host speakers stay silent.
     run_cmd "pactl load-module module-null-sink sink_name=$VIRTUAL_SINK sink_properties=device.description=$VIRTUAL_SINK"
 
-    # Create FakeMic (remap source from VirtualMicSink.monitor)
+    # FakeMic (remap source from VirtualMicSink.monitor) — QEMU uses this as its audio input
     run_cmd "pactl load-module module-remap-source source_name=$FAKE_MIC master=${VIRTUAL_SINK}.monitor source_properties=device.description=$FAKE_MIC"
-
-    # Create SilentTestSink for test audio playback — completely silent on speakers.
-    # Audio is loopbacked into VirtualMicSink so QEMU captures it as mic input.
-    run_cmd "pactl load-module module-null-sink sink_name=$SILENT_SINK sink_properties=device.description=$SILENT_SINK"
-    run_cmd "pactl load-module module-loopback source=$SILENT_SINK.monitor sink=$VIRTUAL_SINK"
 
     wait_for "Virtual mic sinks" 5 "pactl list short sinks | grep -q $VIRTUAL_SINK"
     wait_for "FakeMic source" 5 "pactl list short sources | grep -q $FAKE_MIC"
-    wait_for "SilentTestSink" 5 "pactl list short sinks | grep -q $SILENT_SINK"
-    log_ok "Virtual mic sources created (with silent test sink)"
+    log_ok "Virtual mic sources created"
 }
 
 cleanup_virtual_mic() {
     log_info "Cleaning up virtual mic modules..."
     # Unload each matching module individually (grep may return multiple IDs)
-    for pattern in "$VIRTUAL_SINK" "$FAKE_MIC" "$SILENT_SINK" "module-loopback"; do
+    for pattern in "$VIRTUAL_SINK" "$FAKE_MIC"; do
         pactl list short modules | grep "$pattern" | awk '{print $1}' | while read -r mid; do
             pactl unload-module "$mid" 2>/dev/null || true
         done
@@ -262,16 +268,17 @@ start_emulator() {
     setsid "$EMULATOR" -avd "$AVD" $emu_flags > "$EMU_LOG" 2>&1 &
     echo $! > "$PID_FILE"
 
+    local boot_start=$SECONDS
     log_info "Waiting for emulator boot..."
     wait_for "emulator boot" $EMULATOR_BOOT_TIMEOUT \
         '"$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && "$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | grep -q "^1$"'
-    log_ok "Emulator booted"
+    log_ok "Emulator booted in $(( SECONDS - boot_start ))s"
 }
 
 disable_host_mic() {
-    # We inject audio via the silent virtual mic (SilentTestSink -> loopback ->
-    # VirtualMicSink -> FakeMic). The host microphone must stay OFF so the emulator
-    # does not capture the user's real voice instead of the test audio.
+    # We inject audio via the virtual mic (VirtualMicSink -> FakeMic).
+    # The host microphone must stay OFF so the emulator does not capture
+    # the user's real voice instead of the test audio.
     log_info "Disabling host microphone (using silent virtual FakeMic)..."
     adb_cmd emu avd hostmicoff
     log_ok "Host microphone disabled"
@@ -552,27 +559,67 @@ apply_settings() {
     sleep 1
 }
 
-write_datastore() {
-    local backend="$1"
-    local api_key="$2"
+enable_test_file_mode() {
+    log_info "Enabling use-test-file mode..."
 
-    log_info "Writing DataStore preferences (bypassing UI)..."
+    # The "Use Test File" spinner may be below the fold — scroll to reveal it
+    local scroll_attempts=0
+    while (( scroll_attempts < 5 )); do
+        local coords
+        coords=$(get_field_coords "spinner_use_test_file")
+        read -r x y <<< "$coords"
+        if [[ -n "$x" && -n "$y" ]]; then
+            break
+        fi
+        log_info "Scrolling to reveal Use Test File spinner..."
+        adb_cmd shell input swipe 540 1800 540 600 300
+        sleep 1.5
+        scroll_attempts=$((scroll_attempts + 1))
+    done
 
-    # Generate protobuf binary locally
-    local pb_file
-    pb_file=$(mktemp /tmp/settings-XXXXXX.pb)
-    python3 scripts/write_datastore.py --backend "$backend" --key "$api_key" -o "$pb_file"
+    if [[ -z "$x" || -z "$y" ]]; then
+        die "Could not find Use Test File spinner after scrolling"
+    fi
 
-    # Push to /data/local/tmp/ (world-readable) then run-as cp into app data.
-    # /sdcard/ is unreadable by run-as (UID mismatch); stdin pipe also fails.
-    adb_cmd push "$pb_file" /data/local/tmp/settings.preferences_pb
-    adb_cmd shell "run-as $PACKAGE mkdir -p files/datastore"
-    adb_cmd shell "run-as $PACKAGE cp /data/local/tmp/settings.preferences_pb files/datastore/settings.preferences_pb"
-    adb_cmd shell rm -f /data/local/tmp/settings.preferences_pb
+    # Tap the spinner to open dropdown
+    adb_cmd shell input tap "$x" "$y"
+    sleep 1
 
-    rm -f "$pb_file"
+    # Select "Yes"
+    tap_by_text "Yes"
+    sleep 1
 
-    log_ok "DataStore preferences written ($backend)"
+    # Set test file path to app cache (can't use /sdcard/ on Android 10+)
+    local path_coords
+    path_coords=$(get_field_coords "field_test_file_path")
+    read -r px py <<< "$path_coords"
+    if [[ -n "$px" && -n "$py" ]]; then
+        adb_cmd shell input tap "$px" "$py"
+        sleep 0.5
+        # Move to end, then delete all characters (default path is ~34 chars)
+        adb_cmd shell input keyevent KEYCODE_MOVE_END
+        sleep 0.2
+        for _ in $(seq 1 40); do
+            adb_cmd shell input keyevent KEYCODE_DEL
+        done
+        sleep 0.3
+        adb_cmd shell input text "/data/user/0/$PACKAGE/cache/test-speech-loud.wav"
+        adb_cmd shell input keyevent KEYCODE_BACK
+        sleep 0.5
+        log_ok "Test file path set to app cache"
+    fi
+
+    log_ok "use-test-file mode enabled"
+}
+
+push_test_audio() {
+    log_info "Pushing test audio to emulator app storage..."
+    # Can't use /sdcard/ on Android 10+ (scoped storage EACCES).
+    # Push to /data/local/tmp/ then run-as cp into app cache.
+    adb_cmd push "$WAV_FILE" /data/local/tmp/test-speech-loud.wav
+    adb_cmd shell "run-as $PACKAGE cp /data/local/tmp/test-speech-loud.wav cache/test-speech-loud.wav"
+    adb_cmd shell rm -f /data/local/tmp/test-speech-loud.wav
+    log_ok "Test audio pushed to app cache/test-speech-loud.wav"
 }
 
 # =============================================================================
@@ -618,41 +665,10 @@ focus_text_field() {
     log_warn "Keyboard did not appear after retries — continuing anyway"
 }
 
-play_test_audio() {
-    log_info "Playing test audio into $SILENT_SINK (completely silent on speakers)..."
-    # $SILENT_SINK is a null sink with loopback -> VirtualMicSink -> FakeMic -> emulator mic.
-    # Null sinks produce no speaker output; loopback routes audio into the mic path.
-    run_cmd "paplay --device=$SILENT_SINK $WAV_FILE"
-    log_ok "Audio played"
-}
-
 tap_mic_button() {
     log_info "Triggering mic toggle via broadcast..."
     adb_cmd shell am broadcast -a com.example.whispertoinput.action.TOGGLE_RECORDING
     log_ok "Broadcast sent"
-}
-
-wait_for_recording() {
-    log_info "Waiting for recording to start..."
-    local start_time=$(date +%s)
-    while (( $(date +%s) - start_time < 10 )); do
-        local log
-        log=$(adb_cmd logcat -d -s whisper-input:V 2>/dev/null || true)
-        if echo "$log" | grep -q "Recording started"; then
-            log_ok "Recording started"
-            return 0
-        fi
-        # Check for errors that explain why recording didn't start
-        if echo "$log" | grep -q "prepare() failed"; then
-            log_err "MediaRecorder.prepare() failed — check microphone permissions"
-            adb_cmd logcat -d -s whisper-input:V 2>/dev/null | tail -20 || true
-            return 1
-        fi
-        sleep 0.5
-    done
-    log_warn "Recording start not detected in logcat"
-    log_info "Recent whisper-input logcat:"
-    adb_cmd logcat -d -s whisper-input:V 2>/dev/null | tail -30 || true
 }
 
 wait_for_transcription() {
@@ -691,14 +707,18 @@ run_e2e_test() {
     local api_key="$2"
     local expected="$3"
 
+    TEST_START=$SECONDS
+    STEP_START=$SECONDS
     log_info "=== Starting E2E test for $backend ==="
 
     # 1. Virtual mic
     setup_virtual_mic
+    step_timer "Virtual mic setup"
 
     # 2. Emulator
     start_emulator
     disable_host_mic
+    step_timer "Emulator boot + host mic off"
 
     # Wait for package manager and system services to fully settle after boot
     # (already confirmed via boot_completed, just need a small buffer for PM)
@@ -707,49 +727,52 @@ run_e2e_test() {
     # 3. App
     clear_app_data
     build_and_install
+    step_timer "Build + install"
     grant_permissions
     enable_ime
     set_default_ime "$SERVICE"
+    step_timer "Permissions + IME setup"
 
-    # 3. Settings configuration (bypass UI via DataStore)
+    # 4. Push test audio to emulator (before enabling test-file mode)
+    push_test_audio
+    step_timer "Push test audio"
+
+    # 5. Settings configuration via UI
     local api_key_var="${backend^^}_KEY"
     local api_key="${!api_key_var:-$2}"
     if [[ -z "$api_key" ]]; then
         die "No API key provided for $backend (set ${backend^^}_KEY env var or pass as arg)"
     fi
-    # Configure backend via UI (DataStore bypass was unreliable)
     open_settings
     select_backend "$backend"
     set_api_key "$api_key"
+    step_timer "Backend + API key"
+    enable_test_file_mode
     apply_settings
+    step_timer "Test-file mode + apply"
 
     # Ensure Whisper is default
     set_default_ime "$SERVICE"
 
-    # 4. Trigger recording via tap-to-toggle
+    # 6. Trigger test-file transcription via tap-to-toggle
     focus_text_field          # Opens Settings search bar, keyboard appears
+    step_timer "Focus text field"
 
-    # Clear logcat so wait_for_recording detects fresh messages
-    adb_cmd logcat -c
-    sleep 0.3
-
-    # Start recording
+    # First tap: starts test-file mode (sets flag, no actual recording)
     tap_mic_button
-    wait_for_recording
+    sleep 1
+    step_timer "Test-file start"
 
-    # Play test audio while recording is active
-    play_test_audio
-
-    # Wait for audio to finish playing + buffer
-    sleep $RECORDING_DURATION
-
-    # Stop recording and trigger transcription
+    # Second tap: stops and transcribes the test file
     tap_mic_button
+    step_timer "Test-file transcribe"
 
-    # 5. Wait for transcription
+    # 7. Wait for transcription
     wait_for_transcription "$3"
+    step_timer "Transcription"
 
     log_ok "=== TEST PASSED: $backend ==="
+    echo -e "${GREEN}[TIME]${NC} Total test time: $(( SECONDS - TEST_START ))s"
 }
 
 cleanup() {
