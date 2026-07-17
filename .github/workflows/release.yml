@@ -1,8 +1,18 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - skip
 
 permissions:
   contents: write
@@ -12,7 +22,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'skip-release')"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,23 +37,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install auto
-        run: npm install -g auto
-
-      - name: Calculate version bump
-        id: version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          BUMP=$(auto version --dry-run)
-          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
-          echo "📦 Version bump: $BUMP"
-
       - name: Get current version
         id: current
         run: |
@@ -58,7 +50,13 @@ jobs:
         id: new
         run: |
           CURRENT="${{ steps.current.outputs.name }}"
-          BUMP="${{ steps.version.outputs.bump }}"
+          BUMP="${{ inputs.bump }}"
+
+          if [ "$BUMP" = "skip" ]; then
+            echo "⏭️ Skipping release"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
@@ -75,13 +73,8 @@ jobs:
             patch)
               PATCH=$((PATCH + 1))
               ;;
-            skip|none)
-              echo "⏭️ No release needed"
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              exit 0
-              ;;
             *)
-              echo "⚠️ Unknown bump type: $BUMP, defaulting to patch"
+              echo "⚠️ Unknown bump: $BUMP, defaulting to patch"
               PATCH=$((PATCH + 1))
               ;;
           esac
@@ -115,6 +108,13 @@ jobs:
         run: |
           VERSION="${{ steps.new.outputs.version }}"
           APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+
+          # Commit version bump
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add android/app/build.gradle.kts
+          git commit -m "chore: bump version to $VERSION"
+          git push
 
           # Create tag
           git tag "v$VERSION"
