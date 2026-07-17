@@ -108,7 +108,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.new.outputs.version }}"
-          APK_PATH="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
 
           # Commit version bump
           git config user.name "github-actions[bot]"

@@ -126,14 +126,12 @@ emulator-status:
 # ── E2E Test ───────────────────────────────────────────────────────
 
 # Full E2E test: build, start emulator, install APK, verify voice input
-# APK name differs: debug -> app-debug.apk, release -> app-release-unsigned.apk
+# APK name: debug -> app-debug.apk, release -> app-release.apk
 test-e2e variant="release": (build variant)
     @echo "=== E2E Test ({{variant}}) ==="
     echo "1. Build ✓"
     echo "2. Emulator running ✓"
-    APK=android/app/build/outputs/apk/{{variant}}/app-{{variant}}.apk
-    [ -f "$APK" ] || APK=android/app/build/outputs/apk/{{variant}}/app-{{variant}}-unsigned.apk
-    {{adb}} install -r "$APK"
+    {{adb}} install -r android/app/build/outputs/apk/{{variant}}/app-{{variant}}.apk
     echo "3. APK installed ✓"
     {{adb}} shell ime enable com.example.whispertoinput/.WhisperInputService
     echo "4. IME enabled ✓"
