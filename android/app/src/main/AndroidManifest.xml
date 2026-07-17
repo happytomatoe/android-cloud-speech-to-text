@@ -24,6 +24,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -46,6 +48,20 @@
                 android:resource="@xml/method" />
 
         </service>
+
+        <!-- Voice recognition service for system-wide voice input -->
+        <service android:name=".WhisperRecognitionService"
+            android:label="Whisper Voice Input"
+            android:exported="true"
+            android:foregroundServiceType="microphone"
+            android:permission="android.permission.RECORD_AUDIO">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data android:name="android.speech"
+                android:resource="@xml/voice_recognition_service_meta" />
+        </service>
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -55,6 +71,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".VoiceRecognitionSettingsActivity"
+            android:exported="true" />
     </application>
 
 </manifest>
