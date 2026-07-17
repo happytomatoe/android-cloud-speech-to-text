@@ -12,7 +12,8 @@ avd := "Pixel_8"
 #   just build debug        # debug variant
 build variant="release":
     #!/usr/bin/env bash
-    export JAVA_HOME="${HOME}/.sdkman/candidates/java/17.0.13-tem"
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk env >/dev/null
     VARIANT="{{variant}}"
     cd android && ./gradlew assemble${VARIANT^}
     echo "✅ Build successful (${VARIANT})"
@@ -138,3 +139,29 @@ test-e2e variant="release": (build variant)
     echo "5. Verifying app is registered as voice input..."
     {{adb}} shell ime list -s | grep whispertoinput && echo "   App found in IME list ✓" || echo "   ⚠️  App not in IME list"
     @echo "=== Done ==="
+
+# ── Unit Tests (Robolectric, JVM — no emulator) ───────────────────
+# Runs Tiers 1-3 JVM tests: keyboard state machine, backspace, transcriber, services.
+test-unit:
+    #!/usr/bin/env bash
+    set -e
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk env >/dev/null
+    cd android && ./gradlew testDebugUnitTest
+
+# Alias for `just test-unit`, with cross-module parallelism enabled.
+test:
+    #!/usr/bin/env bash
+    set -e
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk env >/dev/null
+    cd android && ./gradlew testDebugUnitTest --parallel
+
+# ── Instrumented Tests (Espresso, on a running emulator) ──────────
+# Only needed if a Robolectric shadow proves insufficient for a service under test.
+test-instrumented:
+    #!/usr/bin/env bash
+    set -e
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk env >/dev/null
+    cd android && ./gradlew connectedDebugAndroidTest

@@ -132,7 +132,27 @@ class WhisperInputService : InputMethodService() {
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // Don't auto-start — wait for mic button tap
+        if (restarting) return  // don't re-trigger on config changes
+        CoroutineScope(Dispatchers.Main).launch {
+            val autoStart = dataStore.data.map { prefs ->
+                prefs[AUTO_RECORDING_START] ?: false
+            }.first()
+            if (autoStart
+                && !recorderManager.isRecording
+                && recorderManager.allPermissionsGranted(this@WhisperInputService)
+            ) {
+                updateAudioFormat()
+                recorderManager.start(
+                    this@WhisperInputService,
+                    recordedAudioFilename,
+                    useOggFormat
+                )
+                updateMicUI(true)
+                statusLabel?.text = getString(R.string.recording)
+            }
+            // If mic permission not granted yet, do nothing here (user grants via
+            // the app settings or by tapping the mic, which calls launchMainActivity()).
+        }
     }
 
     private fun toggleRecording() {

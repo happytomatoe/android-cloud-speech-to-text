@@ -19,8 +19,22 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Robolectric downloads the android-all-instrumented SDK jars (~hundreds of MB)
+      # on first run. Cache them so CI never re-downloads (this was the slow cold run).
+      - name: Cache Robolectric SDK jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-sdk-${{ hashFiles('android/app/build.gradle.kts') }}
+          restore-keys: |
+            robolectric-sdk-
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug
+        working-directory: android
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --parallel
         working-directory: android
 
       - name: Upload APK artifact
@@ -28,4 +42,12 @@ jobs:
         with:
           name: whisper-to-input-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: android/app/build/reports/tests/testDebugUnitTest
           retention-days: 7

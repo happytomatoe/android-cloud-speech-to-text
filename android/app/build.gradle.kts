@@ -42,6 +42,13 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
+    testOptions {
+        // Allow Robolectric to resolve R.layout.*, R.drawable.*, R.string.* from merged resources
+        unitTests.isIncludeAndroidResources = true
+        // Return default values for unmocked Android calls outside Robolectric's scope
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -52,6 +59,23 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     testImplementation("junit:junit:4.13.2")
+    // Provides ApplicationProvider (Robolectric test context) for unit tests.
+    testImplementation("androidx.test:core:1.5.0")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+
+    // Test infrastructure (Tiers 1-3): Robolectric runs Android framework code on the JVM
+    // (no emulator); MockWebServer stubs the transcription HTTP endpoint; kotlinx-coroutines-test
+    // gives deterministic scheduling for BackspaceButton's delay()-based long-press.
+    testImplementation("org.robolectric:robolectric:4.12.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    // Optional: mock final framework classes (e.g. MediaRecorder) in RecorderManagerTest
+    testImplementation("io.mockk:mockk:1.13.11")
+}
+
+tasks.withType<Test> {
+    // Run test classes concurrently across forks to cut total test time.
+    // Pair with `./gradlew test --parallel` for cross-module parallelism.
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
 }
