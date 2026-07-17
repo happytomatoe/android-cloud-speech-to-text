@@ -38,6 +38,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
 
       - name: Get current version
         id: current
@@ -97,7 +99,7 @@ jobs:
 
       - name: Build Release APK
         if: steps.new.outputs.skip != 'true'
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --no-daemon --parallel --build-cache
         working-directory: android
 
       - name: Create GitHub Release
