@@ -28,34 +28,40 @@
     <!-- Settings -->
     <string name="whisper_to_input_settings_title">Whisper To Input Settings</string>
     <string name="settings_btn_apply">Apply</string>
-    <string name="settings_speech_to_text_backend">Speech to Text Backend</string>
-    <string name="settings_speech_to_text_backend_desc">Use the Voxtral (Mistral), ElevenLabs Scribe, Deepgram, Groq, or 60db backend. An API key is required for Voxtral, ElevenLabs, Deepgram, Groq, and 60db.</string>
+    <string name="settings_speech_to_text_backend">Cloud provider</string>
+    <string name="settings_speech_to_text_backend_desc"></string>
     <string name="settings_option_voxtral">Voxtral (Mistral)</string>
+    <string name="settings_option_voxtral_api_key_url">https://console.mistral.ai/?profile_dialog=api-keys</string>
     <string name="settings_option_voxtral_default_endpoint">https://api.mistral.ai/v1/audio/transcriptions</string>
     <string name="settings_option_voxtral_default_model">voxtral-mini-latest</string>
     <string name="settings_option_voxtral_default_language">auto</string>
 
     <!-- ElevenLabs Scribe -->
     <string name="settings_option_elevenlabs">ElevenLabs Scribe</string>
+    <string name="settings_option_elevenlabs_api_key_url">https://elevenlabs.io/app/settings/api-keys</string>
     <string name="settings_option_elevenlabs_default_endpoint">https://api.elevenlabs.io/v1/speech-to-text</string>
     <string name="settings_option_elevenlabs_default_model">scribe_v1</string>
     <string name="settings_option_elevenlabs_default_language">auto</string>
     <string name="settings_elevenlabs_api_key_url_label">Get your ElevenLabs API key at https://elevenlabs.io/app/api-key</string>
+    <string name="settings_api_key_url_label">Create API key</string>
 
     <!-- Deepgram -->
     <string name="settings_option_deepgram">Deepgram</string>
+    <string name="settings_option_deepgram_api_key_url">https://console.deepgram.com/project/default/settings/api-keys</string>
     <string name="settings_option_deepgram_default_endpoint">https://api.deepgram.com/v1/listen</string>
     <string name="settings_option_deepgram_default_model">nova-3</string>
     <string name="settings_option_deepgram_default_language">auto</string>
 
     <!-- Groq -->
     <string name="settings_option_groq">Groq</string>
+    <string name="settings_option_groq_api_key_url">https://console.groq.com/keys</string>
     <string name="settings_option_groq_default_endpoint">https://api.groq.com/openai/v1/audio/transcriptions</string>
     <string name="settings_option_groq_default_model">whisper-large-v3-turbo</string>
     <string name="settings_option_groq_default_language">auto</string>
 
     <!-- 60db -->
     <string name="settings_option_60db">60db</string>
+    <string name="settings_option_60db_api_key_url">https://app.60db.ai/app/developers</string>
     <string name="settings_option_60db_default_endpoint">https://api.60db.ai/stt</string>
     <string name="settings_option_60db_default_model">60db-stt-v01</string>
     <string name="settings_option_60db_default_language">auto</string>
@@ -97,16 +103,6 @@
     <string-array name="settings_add_trailing_space_array">
         <item>@string/settings_option_yes</item>
         <item>@string/settings_option_no</item>
-    </string-array>
-    <string name="settings_postprocessing">Postprocessing</string>
-    <string name="settings_postprocessing_desc">Choose how to handle text postprocessing.</string>
-    <string name="settings_option_to_traditional">Convert to Traditional Chinese</string>
-    <string name="settings_option_to_simplified">Convert to Simplified Chinese</string>
-    <string name="settings_option_no_conversion">No Conversion</string>
-    <string-array name="settings_postprocessing_array">
-        <item>@string/settings_option_to_traditional</item>
-        <item>@string/settings_option_to_simplified</item>
-        <item>@string/settings_option_no_conversion</item>
     </string-array>
     <string name="settings_use_test_file">Use Test File</string>
     <string name="settings_use_test_file_desc">Use a pre-recorded test file instead of microphone for debugging.</string>

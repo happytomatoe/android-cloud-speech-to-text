@@ -28,11 +28,16 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.*
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.View
 import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
@@ -64,7 +69,6 @@ val MODEL = stringPreferencesKey("model")
 val AUTO_RECORDING_START = booleanPreferencesKey("is-auto-recording-start")
 val AUTO_SWITCH_BACK = booleanPreferencesKey("auto-switch-back")
 val ADD_TRAILING_SPACE = booleanPreferencesKey("add-trailing-space")
-val POSTPROCESSING = stringPreferencesKey("postprocessing")
 val USE_TEST_FILE = booleanPreferencesKey("use-test-file")
 val TEST_FILE_PATH = stringPreferencesKey("test-file-path")
 
@@ -90,6 +94,28 @@ class MainActivity : AppCompatActivity() {
                 R.id.description_test_file_path, R.id.field_test_file_path
             ).forEach { findViewById<View>(it)?.visibility = View.VISIBLE }
         }
+    }
+
+    private fun updateApiKeyLink(provider: String) {
+        val linkView = findViewById<TextView>(R.id.link_api_key)
+        val url = when (provider) {
+            getString(R.string.settings_option_voxtral) -> getString(R.string.settings_option_voxtral_api_key_url)
+            getString(R.string.settings_option_elevenlabs) -> getString(R.string.settings_option_elevenlabs_api_key_url)
+            getString(R.string.settings_option_deepgram) -> getString(R.string.settings_option_deepgram_api_key_url)
+            getString(R.string.settings_option_groq) -> getString(R.string.settings_option_groq_api_key_url)
+            getString(R.string.settings_option_60db) -> getString(R.string.settings_option_60db_api_key_url)
+            else -> return
+        }
+        val label = getString(R.string.settings_api_key_url_label)
+        val spannable = SpannableString(label)
+        spannable.setSpan(object : ClickableSpan() {
+            override fun onClick(widget: View) {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                startActivity(intent)
+            }
+        }, 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        linkView.text = spannable
+        linkView.movementMethod = LinkMovementMethod.getInstance()
     }
 
     override fun onResume() {
@@ -287,6 +313,9 @@ class MainActivity : AppCompatActivity() {
                         if (!setupSettingItemsDone) return
                         isDirty = true
                         btnApply.isEnabled = true
+                        if (parent.id == R.id.spinner_speech_to_text_backend) {
+                            updateApiKeyLink(parent.getItemAtPosition(pos).toString())
+                        }
                         // Deal with individual spinner
                         if (parent.id == R.id.spinner_speech_to_text_backend) {
                             val selectedItem = parent.getItemAtPosition(pos)
@@ -376,6 +405,9 @@ class MainActivity : AppCompatActivity() {
                     spinner.adapter.getItem(it) == value
                 }
                 spinner.setSelection(index ?: 0, false)
+                if (viewId == R.id.spinner_speech_to_text_backend) {
+                    updateApiKeyLink(spinner.selectedItem.toString())
+                }
                 spinner.isEnabled = true
             }
         }
@@ -416,11 +448,6 @@ class MainActivity : AppCompatActivity() {
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
                 ), false),
-                SettingStringDropdown(R.id.spinner_postprocessing, POSTPROCESSING, listOf(
-                    getString(R.string.settings_option_to_traditional),
-                    getString(R.string.settings_option_to_simplified),
-                    getString(R.string.settings_option_no_conversion)
-                ), getString(R.string.settings_option_to_traditional)),
                 if (BuildConfig.DEBUG) SettingDropdown(R.id.spinner_use_test_file, USE_TEST_FILE, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
