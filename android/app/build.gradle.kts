@@ -7,16 +7,7 @@ android {
     namespace = "com.example.whispertoinput"
     compileSdk = 34
 
-    signingConfigs {
-        create("release") {
-            // Sign release builds with debug keystore so APK is installable
-            // For production, replace with a real release keystore
-            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
+
 
     defaultConfig {
         applicationId = "com.example.whispertoinput"
@@ -30,7 +21,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
