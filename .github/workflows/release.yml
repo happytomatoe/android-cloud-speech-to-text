@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
@@ -93,12 +95,9 @@ jobs:
           sed -i "s/versionCode = ${{ steps.current.outputs.code }}/versionCode = ${{ steps.new.outputs.code }}/" android/app/build.gradle.kts
           echo "✅ Updated build.gradle.kts"
 
-      # NOTE: To publish signed release APKs, add a signing config to build.gradle.kts
-      # and store the keystore + credentials as GitHub secrets. For now, we use the
-      # debug APK (signed with debug keystore) so the artifact is actually installable.
-      - name: Build APK
+      - name: Build Release APK
         if: steps.new.outputs.skip != 'true'
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleRelease
         working-directory: android
 
       - name: Create GitHub Release
@@ -107,7 +106,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.new.outputs.version }}"
-          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_PATH="android/app/build/outputs/apk/release/app-release-unsigned.apk"
 
           # Commit version bump
           git config user.name "github-actions[bot]"

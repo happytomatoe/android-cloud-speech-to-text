@@ -7,12 +7,15 @@ avd := "Pixel_8"
 
 # ── Build ──────────────────────────────────────────────────────────
 
-# Build the debug APK
-build:
+# Build the APK (debug or release)
+#   just build              # release (default)
+#   just build variant=debug
+build variant="release":
     #!/usr/bin/env bash
     export JAVA_HOME="${HOME}/.sdkman/candidates/java/17.0.13-tem"
-    cd android && ./gradlew assembleDebug
-    echo "✅ Build successful"
+    VARIANT="{{variant}}"
+    cd android && ./gradlew assemble${VARIANT^}
+    echo "✅ Build successful (${VARIANT})"
 
 # ── Emulator Lifecycle ─────────────────────────────────────────────
 
@@ -123,11 +126,14 @@ emulator-status:
 # ── E2E Test ───────────────────────────────────────────────────────
 
 # Full E2E test: build, start emulator, install APK, verify voice input
-test-e2e: build emulator-start
-    @echo "=== E2E Test ==="
+# APK name differs: debug -> app-debug.apk, release -> app-release-unsigned.apk
+test-e2e variant="release": (build variant)
+    @echo "=== E2E Test ({{variant}}) ==="
     echo "1. Build ✓"
     echo "2. Emulator running ✓"
-    {{adb}} install -r android/app/build/outputs/apk/debug/app-debug.apk
+    APK=android/app/build/outputs/apk/{{variant}}/app-{{variant}}.apk
+    [ -f "$APK" ] || APK=android/app/build/outputs/apk/{{variant}}/app-{{variant}}-unsigned.apk
+    {{adb}} install -r "$APK"
     echo "3. APK installed ✓"
     {{adb}} shell ime enable com.example.whispertoinput/.WhisperInputService
     echo "4. IME enabled ✓"
