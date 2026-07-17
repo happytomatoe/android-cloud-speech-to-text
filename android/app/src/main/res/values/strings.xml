@@ -29,18 +29,7 @@
     <string name="whisper_to_input_settings_title">Whisper To Input Settings</string>
     <string name="settings_btn_apply">Apply</string>
     <string name="settings_speech_to_text_backend">Speech to Text Backend</string>
-    <string name="settings_speech_to_text_backend_desc">Use the official OpenAI API, Whisper ASR Webservice, NVIDIA NIM, Voxtral (Mistral), ElevenLabs Scribe, Deepgram, Groq, or 60db backend. An API key is required for OpenAI, NVIDIA NIM, Voxtral, ElevenLabs, Deepgram, Groq, and 60db.</string>
-    <string name="settings_option_openai_api">OpenAI API</string>
-    <string name="settings_option_openai_api_default_endpoint">https://api.openai.com/v1/audio/transcriptions</string>
-    <string name="settings_option_openai_api_default_model">whisper-1</string>
-    <string name="settings_option_openai_api_default_language">auto</string>
-    <string name="settings_option_whisper_asr_webservice">Whisper ASR Webservice</string>
-    <string name="settings_option_whisper_asr_webservice_default_endpoint">http://localhost:9000/asr</string>
-    <string name="settings_option_whisper_asr_webservice_default_model"></string> <!-- Empty default model -->
-    <string name="settings_option_nvidia_nim">NVIDIA NIM</string>
-    <string name="settings_option_nvidia_nim_default_endpoint">http://localhost:9000/v1/audio/transcriptions</string>
-    <string name="settings_option_nvidia_nim_default_model"></string> <!-- Empty default model -->
-    <string name="settings_option_nvidia_nim_default_language">multi</string> <!-- Empty default language -->
+    <string name="settings_speech_to_text_backend_desc">Use the Voxtral (Mistral), ElevenLabs Scribe, Deepgram, Groq, or 60db backend. An API key is required for Voxtral, ElevenLabs, Deepgram, Groq, and 60db.</string>
     <string name="settings_option_voxtral">Voxtral (Mistral)</string>
     <string name="settings_option_voxtral_default_endpoint">https://api.mistral.ai/v1/audio/transcriptions</string>
     <string name="settings_option_voxtral_default_model">voxtral-mini-latest</string>
@@ -71,9 +60,6 @@
     <string name="settings_option_60db_default_model">60db-stt-v01</string>
     <string name="settings_option_60db_default_language">auto</string>
     <string-array name="settings_speech_to_text_backend_array">
-        <item>@string/settings_option_openai_api</item>
-        <item>@string/settings_option_whisper_asr_webservice</item>
-        <item>@string/settings_option_nvidia_nim</item>
         <item>@string/settings_option_voxtral</item>
         <item>@string/settings_option_elevenlabs</item>
         <item>@string/settings_option_deepgram</item>
@@ -81,14 +67,14 @@
         <item>@string/settings_option_60db</item>
     </string-array>
     <string name="settings_endpoint">Endpoint</string>
-    <string name="settings_endpoint_desc">The host and port for the STT endpoint (e.g., OpenAI API, Deepgram, Groq, 60db, Whisper ASR Webservice, or NVIDIA NIM).</string>
+    <string name="settings_endpoint_desc">The host and port for the STT endpoint.</string>
     <string name="settings_endpoint_hint"><![CDATA[e.g., http://<host>:<port>/asr]]></string>
     <string name="settings_language_code">Language Code</string>
     <string name="settings_language_code_desc">The language code to be included in the request payload (e.g., en, zh).</string>
     <string name="settings_language_code_hint">Enter Language Code (e.g., en, zh)</string>
     <string name="settings_api_key">API Key</string>
-    <string name="settings_api_key_desc">The API key for the selected backend (required for OpenAI, NVIDIA NIM, Voxtral, ElevenLabs, Deepgram, Groq, and 60db).</string>
-    <string name="settings_api_key_hint">Enter OpenAI API Key…</string>
+    <string name="settings_api_key_desc">The API key for the selected backend.</string>
+    <string name="settings_api_key_hint">Enter API Key…</string>
     <string name="settings_model">Model</string>
     <string name="settings_model_desc">The model to use for transcription (e.g., whisper-1).</string>
     <string name="settings_model_hint">Enter model name (e.g., whisper-1)</string>
@@ -122,6 +108,17 @@
         <item>@string/settings_option_to_simplified</item>
         <item>@string/settings_option_no_conversion</item>
     </string-array>
+    <string name="settings_use_test_file">Use Test File</string>
+    <string name="settings_use_test_file_desc">Use a pre-recorded test file instead of microphone for debugging.</string>
+    <string-array name="settings_use_test_file_array">
+        <item>@string/settings_option_yes</item>
+        <item>@string/settings_option_no</item>
+    </string-array>
+    <string name="settings_test_file_path">Test File Path</string>
+    <string name="settings_test_file_path_desc">Path to the test audio file on the device (e.g., /sdcard/test-speech-loud.wav).</string>
+    <string name="settings_test_file_path_hint">/sdcard/test-speech-loud.wav</string>
+    <string name="settings_debug_output_label">Transcription Output</string>
+    <string name="settings_debug_output_hint">Transcribed text will appear here…</string>
     <string name="desc_space_bar">Space Bar</string>
 
 </resources>
