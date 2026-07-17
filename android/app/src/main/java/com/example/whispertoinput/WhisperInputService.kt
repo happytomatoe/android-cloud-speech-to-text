@@ -142,52 +142,61 @@ class WhisperInputService : InputMethodService() {
     }
 
     private fun toggleRecording() {
+        // Test-file mode: no mic/notification permissions needed, check first
+        if (BuildConfig.DEBUG) {
+            CoroutineScope(Dispatchers.Main).launch {
+                val useTestFile = dataStore.data
+                    .map { it[USE_TEST_FILE] ?: false }
+                    .first()
+
+                if (useTestFile) {
+                    if (testFileModeRecording) {
+                        // Stop test file recording and transcribe
+                        testFileModeRecording = false
+                        updateMicUI(false)
+                        statusLabel?.text = getString(R.string.transcribing)
+
+                        val testFilePath = dataStore.data
+                            .map { it[TEST_FILE_PATH] ?: "/sdcard/test-speech-loud.wav" }
+                            .first()
+
+                        whisperTranscriber.startAsync(this@WhisperInputService,
+                            testFilePath,
+                            AUDIO_MEDIA_TYPE_WAV,
+                            "",
+                            { text ->
+                                android.util.Log.d("whisper-input", "Transcription result: '$text'")
+                                transcriptionCallback(text)
+                            },
+                            { msg ->
+                                android.util.Log.e("whisper-input", "Transcription error: $msg")
+                                transcriptionExceptionCallback(msg)
+                            })
+                    } else {
+                        // Start test file recording (just update UI)
+                        testFileModeRecording = true
+                        updateMicUI(true)
+                        statusLabel?.text = getString(R.string.recording)
+                    }
+                    return@launch
+                }
+                // Fall through to normal recording (requires permissions)
+                toggleRecordingNormal()
+            }
+            return
+        }
+        toggleRecordingNormal()
+    }
+
+    private fun toggleRecordingNormal() {
         if (!recorderManager.allPermissionsGranted(this)) {
             launchMainActivity()
             return
         }
 
-        // Launch coroutine to handle toggle logic (includes async DataStore reads)
         CoroutineScope(Dispatchers.Main).launch {
-            // Check if test file mode is enabled (debug builds only)
-            val useTestFile = if (BuildConfig.DEBUG) {
-                dataStore.data
-                    .map { it[USE_TEST_FILE] ?: false }
-                    .first()
-            } else false
-
-            if (useTestFile) {
-                // Test file mode: use testFileModeRecording flag
-                if (testFileModeRecording) {
-                    // Stop test file recording and transcribe
-                    testFileModeRecording = false
-                    updateMicUI(false)
-                    statusLabel?.text = getString(R.string.transcribing)
-
-                    val testFilePath = dataStore.data
-                        .map { it[TEST_FILE_PATH] ?: "/sdcard/test-speech-loud.wav" }
-                        .first()
-
-                    whisperTranscriber.startAsync(this@WhisperInputService,
-                        testFilePath,
-                        AUDIO_MEDIA_TYPE_WAV,
-                        "",
-                        { text ->
-                            android.util.Log.d("whisper-input", "Transcription result: '$text'")
-                            transcriptionCallback(text)
-                        },
-                        { msg ->
-                            android.util.Log.e("whisper-input", "Transcription error: $msg")
-                            transcriptionExceptionCallback(msg)
-                        })
-                } else {
-                    // Start test file recording (just update UI)
-                    testFileModeRecording = true
-                    updateMicUI(true)
-                    statusLabel?.text = getString(R.string.recording)
-                }
-            } else if (recorderManager.isRecording) {
-                // Normal mode: stop recording and transcribe
+            if (recorderManager.isRecording) {
+                // Stop recording and transcribe
                 recorderManager.stop()
                 updateMicUI(false)
                 statusLabel?.text = getString(R.string.transcribing)
@@ -205,7 +214,7 @@ class WhisperInputService : InputMethodService() {
                         transcriptionExceptionCallback(msg)
                     })
             } else {
-                // Normal mode: start recording
+                // Start recording
                 updateAudioFormat()
                 recorderManager.start(this@WhisperInputService, recordedAudioFilename, useOggFormat)
                 updateMicUI(true)
@@ -232,11 +241,14 @@ class WhisperInputService : InputMethodService() {
 
     override fun onWindowHidden() {
         super.onWindowHidden()
-        android.util.Log.d("whisper-input", "onWindowHidden: isRecording=${recorderManager.isRecording}")
+        android.util.Log.d("whisper-input", "onWindowHidden: isRecording=${recorderManager.isRecording} testFileMode=$testFileModeRecording")
         if (recorderManager.isRecording) {
             recorderManager.stop()
-            updateMicUI(false)
         }
+        if (testFileModeRecording) {
+            testFileModeRecording = false
+        }
+        updateMicUI(false)
     }
 
     override fun onDestroy() {

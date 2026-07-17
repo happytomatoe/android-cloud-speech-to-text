@@ -89,14 +89,14 @@
             <TextView
                 android:id="@+id/label_debug_output"
                 style="@style/SettingsLabel"
-                android:text="Transcription Output"
+                android:text="@string/settings_debug_output_label"
                 android:visibility="gone" />
             <EditText
                 android:id="@+id/field_debug_output"
                 style="@style/SettingsField"
                 android:layout_height="120dp"
                 android:gravity="top|start"
-                android:hint="Transcribed text will appear here..."
+                android:hint="@string/settings_debug_output_hint"
                 android:inputType="textMultiLine"
                 android:importantForAutofill="no"
                 android:focusable="true"
@@ -240,33 +240,39 @@
                 style="@style/SettingsSpinner"
                 android:entries="@array/settings_add_trailing_space_array" />
 
-            <!-- Use Test File -->
+            <!-- Use Test File (debug only) -->
             <TextView
                 android:id="@+id/label_use_test_file"
                 style="@style/SettingsLabel"
-                android:text="@string/settings_use_test_file" />
+                android:text="@string/settings_use_test_file"
+                android:visibility="gone" />
             <TextView
                 android:id="@+id/description_use_test_file"
                 style="@style/SettingsDescription"
-                android:text="@string/settings_use_test_file_desc" />
+                android:text="@string/settings_use_test_file_desc"
+                android:visibility="gone" />
             <Spinner
                 android:id="@+id/spinner_use_test_file"
                 style="@style/SettingsSpinner"
-                android:entries="@array/settings_use_test_file_array" />
+                android:entries="@array/settings_use_test_file_array"
+                android:visibility="gone" />
 
-            <!-- Test File Path -->
+            <!-- Test File Path (debug only) -->
             <TextView
                 android:id="@+id/label_test_file_path"
                 style="@style/SettingsLabel"
-                android:text="@string/settings_test_file_path" />
+                android:text="@string/settings_test_file_path"
+                android:visibility="gone" />
             <TextView
                 android:id="@+id/description_test_file_path"
                 style="@style/SettingsDescription"
-                android:text="@string/settings_test_file_path_desc" />
+                android:text="@string/settings_test_file_path_desc"
+                android:visibility="gone" />
             <EditText
                 android:id="@+id/field_test_file_path"
                 style="@style/SettingsField"
-                android:hint="@string/settings_test_file_path_hint" />
+                android:hint="@string/settings_test_file_path_hint"
+                android:visibility="gone" />
 
         </LinearLayout>
     </ScrollView>

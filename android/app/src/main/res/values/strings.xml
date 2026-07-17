@@ -117,6 +117,8 @@
     <string name="settings_test_file_path">Test File Path</string>
     <string name="settings_test_file_path_desc">Path to the test audio file on the device (e.g., /sdcard/test-speech-loud.wav).</string>
     <string name="settings_test_file_path_hint">/sdcard/test-speech-loud.wav</string>
+    <string name="settings_debug_output_label">Transcription Output</string>
+    <string name="settings_debug_output_hint">Transcribed text will appear here…</string>
     <string name="desc_space_bar">Space Bar</string>
 
 </resources>

@@ -77,12 +77,18 @@ class MainActivity : AppCompatActivity() {
         setupSettingItems()
         checkPermissions()
 
-        // Show debug output field in debug builds
+        // Show debug-only fields in debug builds
         if (BuildConfig.DEBUG) {
             val debugLabel = findViewById<View>(R.id.label_debug_output)
             val debugField = findViewById<EditText>(R.id.field_debug_output)
             debugLabel?.visibility = View.VISIBLE
             debugField?.visibility = View.VISIBLE
+            // Show test-file settings
+            listOf(
+                R.id.label_use_test_file, R.id.description_use_test_file,
+                R.id.spinner_use_test_file, R.id.label_test_file_path,
+                R.id.description_test_file_path, R.id.field_test_file_path
+            ).forEach { findViewById<View>(it)?.visibility = View.VISIBLE }
         }
     }
 
