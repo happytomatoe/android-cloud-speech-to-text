@@ -35,7 +35,6 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
-import com.github.liuyueyi.quick.transfer.ChineseUtils
 
 class WhisperTranscriber {
     private data class Config(
@@ -44,7 +43,6 @@ class WhisperTranscriber {
         val speechToTextBackend: String,
         val apiKey: String,
         val model: String,
-        val postprocessing: String,
         val addTrailingSpace: Boolean
     )
 
@@ -61,14 +59,13 @@ class WhisperTranscriber {
     ) {
         suspend fun makeWhisperRequest(): String {
             // Retrieve configs
-            val (endpoint, languageCode, speechToTextBackend, apiKey, model, postprocessing, addTrailingSpace) = context.dataStore.data.map { preferences: Preferences ->
+            val (endpoint, languageCode, speechToTextBackend, apiKey, model, addTrailingSpace) = context.dataStore.data.map { preferences: Preferences ->
                 Config(
                     preferences[ENDPOINT] ?: "",
                     preferences[LANGUAGE_CODE] ?: "",
                     preferences[SPEECH_TO_TEXT_BACKEND] ?: context.getString(R.string.settings_option_voxtral),
                     preferences[API_KEY] ?: "",
                     preferences[MODEL] ?: "",
-                    preferences[POSTPROCESSING] ?: context.getString(R.string.settings_option_no_conversion),
                     preferences[ADD_TRAILING_SPACE] ?: false
                 )
             }.first()
@@ -150,17 +147,11 @@ class WhisperTranscriber {
                 }
             }
             
-            val processedText = when (postprocessing) {
-                context.getString(R.string.settings_option_to_simplified) -> ChineseUtils.tw2s(rawText)
-                context.getString(R.string.settings_option_to_traditional) -> ChineseUtils.s2tw(rawText)
-                else -> rawText // No conversion
-            }
-
             if (attachToEnd == "") {
-                return processedText + if (addTrailingSpace) " " else ""
+                return rawText + if (addTrailingSpace) " " else ""
             } else {
                 // Only used for space key and enter key.
-                return processedText + attachToEnd
+                return rawText + attachToEnd
             }
         }
 
