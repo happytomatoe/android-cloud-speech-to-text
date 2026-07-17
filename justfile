@@ -9,7 +9,7 @@ avd := "Pixel_8"
 
 # Build the APK (debug or release)
 #   just build              # release (default)
-#   just build variant=debug
+#   just build debug        # debug variant
 build variant="release":
     #!/usr/bin/env bash
     export JAVA_HOME="${HOME}/.sdkman/candidates/java/17.0.13-tem"
