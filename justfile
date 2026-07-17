@@ -142,14 +142,8 @@ test-e2e variant="release": (build variant)
 
 # ── Unit Tests (Robolectric, JVM — no emulator) ───────────────────
 # Runs Tiers 1-3 JVM tests: keyboard state machine, backspace, transcriber, services.
-test-unit:
-    #!/usr/bin/env bash
-    set -e
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk env >/dev/null
-    cd android && ./gradlew testDebugUnitTest
-
-# Alias for `just test-unit`, with cross-module parallelism enabled.
+# `just test` runs them with cross-module parallelism enabled (see gradle.properties:
+# org.gradle.parallel=true).
 test:
     #!/usr/bin/env bash
     set -e
@@ -165,3 +159,9 @@ test-instrumented:
     source "$HOME/.sdkman/bin/sdkman-init.sh"
     sdk env >/dev/null
     cd android && ./gradlew connectedDebugAndroidTest
+
+# ── Repo Setup ───────────────────────────────────────────────────
+# Point git at the repo's tracked hooks (e.g. commit-msg that forbids
+# Co-Authored-By trailers). Run once after cloning.
+setup-hooks:
+    git config core.hooksPath .githooks
