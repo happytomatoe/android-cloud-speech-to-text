@@ -30,8 +30,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.datastore.preferences.core.Preferences
 import com.example.whispertoinput.recorder.RecorderManager
-import com.github.liuyueyi.quick.transfer.ChineseUtils
-import com.github.liuyueyi.quick.transfer.constants.TransType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -123,10 +121,6 @@ class WhisperInputService : InputMethodService() {
         micButton?.setOnClickListener {
             toggleRecording()
         }
-
-        // Preload conversion table
-        ChineseUtils.preLoad(true, TransType.SIMPLE_TO_TAIWAN)
-        ChineseUtils.preLoad(true, TransType.TAIWAN_TO_SIMPLE)
 
         CoroutineScope(Dispatchers.Main).launch {
             updateAudioFormat()
