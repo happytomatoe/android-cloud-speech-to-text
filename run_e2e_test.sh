@@ -513,36 +513,15 @@ select_backend() {
     done
     [[ -z "$ep" ]] && log_warn "Endpoint field never populated — UI may not have initialized"
 
-    # Open the backend spinner. Try `hs find` first (stable hs connection),
-    # fall back to uiautomator dump + input tap. hs's tappable-node index
-    # intermittently misses Spinners, causing flaky NOT_FOUND.
+    # Open the backend spinner. Wait for spinner to be findable by hs
+    # (which means it's in the accessibility tree and interactive) before tapping.
     local tap_ok=false
-    for attempt in 1 2 3 4 5; do
-        # Try hs find first (uses stable hs connection, searches all nodes)
-        local node bounds
-        node=$($HS find 'Spinner[id=com.example.whispertoinput:id/spinner_speech_to_text_backend]' --json 2>/dev/null | head -1)
-        if [[ -n "$node" ]]; then
-            bounds=$(echo "$node" | grep -oP 'bounds="\K\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]' 2>/dev/null)
-            if [[ -n "$bounds" ]]; then
-                local x1 y1 x2 y2 cx cy
-                x1=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\1/')
-                y1=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\2/')
-                x2=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\3/')
-                y2=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\4/')
-                cx=$(( (x1 + x2) / 2 ))
-                cy=$(( (y1 + y2) / 2 ))
-                if $HS tap "$cx" "$cy" >/dev/null 2>&1; then
-                    tap_ok=true
-                    break
-                fi
-            fi
-        fi
-        # Fallback: uiautomator dump + input tap
-        if tap_rid_via_ui "spinner_speech_to_text_backend"; then
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        if $HS tap "#spinner_speech_to_text_backend" --retries 2 --retry-delay 1s --timeout 3s >/dev/null 2>&1; then
             tap_ok=true
             break
         fi
-        log_warn "Spinner tap failed (attempt $attempt/5), retrying..."
+        log_warn "Spinner tap failed (attempt $attempt/10), retrying..."
         ssleep 1
     done
     if [[ "$tap_ok" != "true" ]]; then
