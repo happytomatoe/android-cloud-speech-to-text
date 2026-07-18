@@ -819,8 +819,6 @@ run_e2e_test() {
     step_timer "Transcription"
 
     # Negative-path assertions (observational; do not alter the happy path).
-    # Kill the monitor early — no need to wait the full TRANSCRIPTION_TIMEOUT
-    kill "$MON_PID" 2>/dev/null || true
     wait "$MON_PID" 2>/dev/null || true
     if [[ "$STATUS_SEEN_RECORDING" == "true" && "$STATUS_SEEN_TRANSCRIBING" == "true" ]]; then
         log_ok "Status label cycled recording -> transcribing"
