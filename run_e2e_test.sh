@@ -190,6 +190,14 @@ capture_diag() {
         || "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
         || "$ADB" -s "$SERIAL" shell screencap -p > "$out" 2>/dev/null \
         || log_warn "screenshot failed (emulator may not be reachable)"
+
+    # Also dump the UI hierarchy as XML (text-based, easy to grep/inspect
+    # for the exact node/resource-id that was missing at failure time).
+    local xml="${out%.png}.xml"
+    "$ADB" -s "$SERIAL" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 \
+        && "$ADB" -s "$SERIAL" pull /sdcard/ui.xml "$xml" >/dev/null 2>&1 \
+        && log_warn "Captured diagnostic UI hierarchy -> $xml" \
+        || log_warn "ui dump failed (emulator may not be reachable)"
 }
 
 cleanup_virtual_mic() {

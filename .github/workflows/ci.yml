@@ -90,4 +90,5 @@ jobs:
             android/app/build/reports/tests/testDebugUnitTest
             e2e_test.log
             e2e_diag.png
+            e2e_diag.xml
           retention-days: 7
