@@ -111,8 +111,8 @@ jobs:
           APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
 
           # Create tag
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
+          git tag -f "v$VERSION"
+          git push -f origin "v$VERSION"
 
           # Create release with APK
           gh release create "v$VERSION" \
