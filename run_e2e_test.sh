@@ -473,30 +473,47 @@ select_backend() {
 
     log_info "Selecting backend: $display"
 
+    # The settings UI initializes asynchronously: the spinner's selection
+    # listener and the endpoint/model field defaults are set in coroutines.
+    # Tapping the spinner before that finishes is a race — the selection is
+    # ignored and the endpoint field stays empty. Wait until the endpoint
+    # field is populated with its default before interacting.
+    local ep=""
+    for _ in $(seq 1 30); do
+        ep=$(hs find 'EditText[id=com.example.whispertoinput:id/field_endpoint]' --json 2>/dev/null \
+            | grep -oP '"text":\s*"\K[^"]*' | head -1)
+        [[ -n "$ep" ]] && break
+        ssleep 0.5
+    done
+    [[ -z "$ep" ]] && log_warn "Endpoint field never populated — UI may not have initialized"
+
     # Tap the spinner; daemon retries on TIMEOUT/NOT_FOUND over the warm socket.
-    # (Use `hs tap` here — the `#rid` shorthand is a `tap`-only convenience;
-    # `hs act --tap` does not resolve it and would report NOT_FOUND.)
     if ! $HS tap "#spinner_speech_to_text_backend" --retries 4 --retry-delay 2s --timeout 5s >/dev/null 2>&1; then
         die "Could not find spinner after retries"
     fi
     ssleep 0.5
 
-    # Select the backend from the dropdown: tap-then-verify the endpoint field
-    # reflects the new backend (fallback to a plain text tap if act is unhappy).
+    # Select the backend from the dropdown (fallback to a plain text tap).
     $HS act --tap "$display" \
         --until 'EditText[id=com.example.whispertoinput:id/field_endpoint]' \
         --retries 2 --retry-delay 1s --timeout 5s >/dev/null 2>&1 \
         || hs_tap_text "$display"
-    ssleep 0.5
 
-    # Verify endpoint updated (single dump, parse both fields)
+    # Verify the endpoint/model reflect the selected backend. The autofill is
+    # async, so poll instead of reading once.
     local expected="${BACKEND_ENDPOINT[$backend]}"
     local model="${BACKEND_MODEL[$backend]}"
-
-    local endpoint_text model_text
-    endpoint_text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_endpoint]' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1)
-    model_text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_model]' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1)
-
+    local endpoint_text="" model_text=""
+    for _ in $(seq 1 20); do
+        endpoint_text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_endpoint]' --json 2>/dev/null \
+            | grep -oP '"text":\s*"\K[^"]*' | head -1)
+        model_text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_model]' --json 2>/dev/null \
+            | grep -oP '"text":\s*"\K[^"]*' | head -1)
+        if [[ "$endpoint_text" == *"$expected"* && "$model_text" == *"$model"* ]]; then
+            break
+        fi
+        ssleep 0.5
+    done
     if [[ "$endpoint_text" != *"$expected"* ]]; then
         die "Endpoint mismatch: expected $expected, got $endpoint_text"
     fi
