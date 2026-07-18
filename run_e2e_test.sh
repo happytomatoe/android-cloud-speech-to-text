@@ -188,10 +188,10 @@ setup_virtual_mic() {
 capture_diag() {
     local out="${1:-e2e_diag.png}"
     log_warn "Capturing diagnostic screenshot -> $out"
-    # Prefer hs see (agent-sized JPEG); fall back to adb screencap if the
-    # daemon isn't reachable (e.g. emulator unreachable at failure time).
-    hs --device "$SERIAL" see --size 768 "$out" 2>/dev/null \
-        || "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
+    # Prefer adb screencap — it needs no UiAutomation/daemon, so it works
+    # whenever the emulator is reachable (even if the hs daemon is down).
+    "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
+        || hs --device "$SERIAL" see --size 768 "$out" 2>/dev/null \
         || "$ADB" -s "$SERIAL" shell screencap -p > "$out" 2>/dev/null \
         || log_warn "screenshot failed (emulator may not be reachable)"
 
@@ -477,7 +477,21 @@ hs_scroll_down() {
 # verb; on a dev machine it's a safe no-op if the daemon is already up.
 hs_daemon_start() {
     log_info "Starting hs daemon..."
-    hs --device "$SERIAL" use >/dev/null 2>&1 || hs use >/dev/null 2>&1 || true
+    local up=false
+    for _ in 1 2 3 4 5; do
+        hs --device "$SERIAL" use >/dev/null 2>&1 || true
+        # Verify the daemon can actually read the screen — a silent `use`
+        # failure would otherwise surface later as spurious "spinner not
+        # found" errors with no diagnostic.
+        if timeout 15 $HS ui >/dev/null 2>&1; then
+            up=true
+            break
+        fi
+        ssleep 1
+    done
+    if [[ "$up" != "true" ]]; then
+        die "hs daemon failed to start / connect to $SERIAL (UI automation unavailable)"
+    fi
     log_ok "hs daemon ready"
 }
 
@@ -491,6 +505,17 @@ open_settings() {
     # Wait for the Settings activity to reach the foreground (no raw dumpsys poll)
     $HS wait "$PACKAGE/.MainActivity" --timeout 5s >/dev/null 2>&1 \
         || wait_for "Settings activity ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
+    # Wait until the Settings UI is actually rendered (spinner present, dropdown
+    # closed) so subsequent taps don't hit a not-yet-initialised or wrong window.
+    local ready=false
+    for _ in $(seq 1 30); do
+        if timeout 15 $HS ui 2>/dev/null | grep -q "#spinner_speech_to_text_backend"; then
+            ready=true
+            break
+        fi
+        ssleep 0.5
+    done
+    [[ "$ready" == "true" ]] || die "Settings screen never rendered (spinner not found in UI tree)"
 }
 
 select_backend() {

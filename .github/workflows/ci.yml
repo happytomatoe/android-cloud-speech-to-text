@@ -73,7 +73,7 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_7
-          emulator-options: '-no-window -gpu swiftshader_indirect -noaudio -no-snapshot-save'
+          emulator-options: '-no-window -gpu swiftshader -noaudio -no-snapshot-save'
           disable-animations: true
           script: |
             git config --global --add safe.directory '*'
