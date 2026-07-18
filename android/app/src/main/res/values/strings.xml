@@ -116,5 +116,7 @@
     <string name="settings_debug_output_label">Transcription Output</string>
     <string name="settings_debug_output_hint">Transcribed text will appear here…</string>
     <string name="desc_space_bar">Space Bar</string>
+    <!-- Enable keyboard prompt (shown after Apply if the IME is not yet enabled) -->
+    <string name="settings_keyboard_enable_prompt">Whisper Input keyboard is not enabled. Tap to open keyboard settings and enable it.</string>
 
 </resources>

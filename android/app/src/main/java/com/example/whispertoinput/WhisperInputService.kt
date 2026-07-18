@@ -30,8 +30,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.datastore.preferences.core.Preferences
 import com.example.whispertoinput.recorder.RecorderManager
-import com.github.liuyueyi.quick.transfer.ChineseUtils
-import com.github.liuyueyi.quick.transfer.constants.TransType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -124,10 +122,6 @@ class WhisperInputService : InputMethodService() {
             toggleRecording()
         }
 
-        // Preload conversion table
-        ChineseUtils.preLoad(true, TransType.SIMPLE_TO_TAIWAN)
-        ChineseUtils.preLoad(true, TransType.TAIWAN_TO_SIMPLE)
-
         CoroutineScope(Dispatchers.Main).launch {
             updateAudioFormat()
         }
@@ -138,7 +132,27 @@ class WhisperInputService : InputMethodService() {
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // Don't auto-start — wait for mic button tap
+        if (restarting) return  // don't re-trigger on config changes
+        CoroutineScope(Dispatchers.Main).launch {
+            val autoStart = dataStore.data.map { prefs ->
+                prefs[AUTO_RECORDING_START] ?: false
+            }.first()
+            if (autoStart
+                && !recorderManager.isRecording
+                && recorderManager.allPermissionsGranted(this@WhisperInputService)
+            ) {
+                updateAudioFormat()
+                recorderManager.start(
+                    this@WhisperInputService,
+                    recordedAudioFilename,
+                    useOggFormat
+                )
+                updateMicUI(true)
+                statusLabel?.text = getString(R.string.recording)
+            }
+            // If mic permission not granted yet, do nothing here (user grants via
+            // the app settings or by tapping the mic, which calls launchMainActivity()).
+        }
     }
 
     private fun toggleRecording() {

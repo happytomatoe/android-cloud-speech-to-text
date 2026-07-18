@@ -85,6 +85,17 @@
             android:minHeight="100dp"
             android:orientation="vertical" >
 
+            <!-- Enable keyboard prompt (revealed after Apply if the IME is not yet enabled) -->
+            <TextView
+                android:id="@+id/link_enable_keyboard"
+                style="@style/SettingsDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:textColor="?attr/colorPrimary"
+                android:text="@string/settings_keyboard_enable_prompt"
+                android:visibility="gone" />
+
             <!-- Debug Transcription Output (only visible in debug builds) -->
             <TextView
                 android:id="@+id/label_debug_output"

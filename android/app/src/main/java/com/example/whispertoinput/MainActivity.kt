@@ -33,6 +33,7 @@ import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
@@ -47,6 +48,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -75,10 +77,21 @@ val TEST_FILE_PATH = stringPreferencesKey("test-file-path")
 class MainActivity : AppCompatActivity() {
     private var setupSettingItemsDone: Boolean = false
 
+    /**
+     * Completes once [setupSettingItems] has finished populating all settings.
+     * Tests can await this instead of polling a side-effect field.
+     */
+    @androidx.annotation.VisibleForTesting
+    val settingsReady = CompletableDeferred<Unit>()
+
+    // Set once the user taps Apply, so the enable-keyboard prompt only appears on request.
+    private var keyboardPromptRequested: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setupSettingItems()
+        setupEnableKeyboardLink()
         checkPermissions()
 
         // Show debug-only fields in debug builds
@@ -120,6 +133,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Keep the enable-keyboard prompt in sync once the user has been prompted.
+        if (keyboardPromptRequested) {
+            updateKeyboardEnabledPrompt()
+        }
         // Update debug field with last transcription result or error
         if (BuildConfig.DEBUG) {
             val debugField = findViewById<EditText>(R.id.field_debug_output)
@@ -130,6 +147,42 @@ class MainActivity : AppCompatActivity() {
                 result != null -> debugField?.setText(result)
             }
         }
+    }
+
+    /**
+     * Wires the (initially hidden) enable-keyboard link so tapping it opens the
+     * system input-method settings where the user can enable this keyboard.
+     */
+    private fun setupEnableKeyboardLink() {
+        val linkView = findViewById<TextView>(R.id.link_enable_keyboard)
+        val text = getString(R.string.settings_keyboard_enable_prompt)
+        val spannable = SpannableString(text)
+        spannable.setSpan(object : ClickableSpan() {
+            override fun onClick(widget: View) {
+                startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+            }
+        }, 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        linkView.text = spannable
+        linkView.movementMethod = LinkMovementMethod.getInstance()
+    }
+
+    /**
+     * Returns true if the "Whisper Input" IME is enabled in system settings.
+     */
+    private fun isWhisperKeyboardEnabled(): Boolean {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        return imm.enabledInputMethodList.any {
+            it.serviceInfo.packageName == packageName &&
+                it.serviceInfo.name.endsWith("WhisperInputService")
+        }
+    }
+
+    /**
+     * Shows the enable-keyboard link when this IME is not yet enabled.
+     */
+    private fun updateKeyboardEnabledPrompt() {
+        val linkView = findViewById<TextView>(R.id.link_enable_keyboard)
+        linkView.visibility = if (isWhisperKeyboardEnabled()) View.GONE else View.VISIBLE
     }
 
     // The onClick event of the grant permission button.
@@ -229,11 +282,6 @@ class MainActivity : AppCompatActivity() {
                 val btnApply: Button = findViewById(R.id.btn_settings_apply)
                 val editText = findViewById<EditText>(viewId)
                 editText.isEnabled = false
-                editText.doOnTextChanged { _, _, _, _ ->
-                    if (!setupSettingItemsDone) return@doOnTextChanged
-                    isDirty = true
-                    btnApply.isEnabled = true
-                }
 
                 // Read data. If none, apply default value.
                 val settingValue: String? = readSetting(preferenceKey)
@@ -243,6 +291,11 @@ class MainActivity : AppCompatActivity() {
                 }
                 editText.setText(value)
                 editText.isEnabled = true
+                editText.doOnTextChanged { _, _, _, _ ->
+                    if (!setupSettingItemsDone) return@doOnTextChanged
+                    isDirty = true
+                    btnApply.isEnabled = true
+                }
             }
         }
         override suspend fun apply() {
@@ -462,12 +515,15 @@ class MainActivity : AppCompatActivity() {
                     for (settingItem in settingItems) {
                         settingItem.apply()
                     }
+                    keyboardPromptRequested = true
+                    updateKeyboardEnabledPrompt()
                     btnApply.isEnabled = false
                 }
                 Toast.makeText(this@MainActivity, R.string.successfully_set, Toast.LENGTH_SHORT).show()
             }
             settingItems.map { settingItem -> settingItem.setup() }.joinAll()
             setupSettingItemsDone = true
+            settingsReady.complete(Unit)
         }
     }
 }

@@ -7,22 +7,39 @@
 Before executing any build, test, emulator, or deployment commands, **read the justfile** or run `just -l` to see available commands. This project has well-structured `just` targets that handle environment setup, paths, and flags correctly.
 
 **Why:** The justfile encapsulates project-specific details like:
-- Correct `JAVA_HOME` and `ANDROID_HOME` paths
+- Correct `JAVA_HOME` and `ANDROID_HOME` paths (via `sdk env`)
 - Emulator flags (`-gpu host`, `-no-snapshot-load`, headless vs headful)
 - APK build paths and install commands
 - E2E test orchestration
 
-Don't reinvent these — use them.
+Don't reinvent these — **always prefer a `just` target over hand-written `gradlew`/`adb`/`emulator` commands.** If you find yourself typing a long `./gradlew`/`adb`/`emulator` command by hand, check `just -l` first — there is almost certainly a target for it.
 
 ```bash
-just -l                  # List all available commands
-just build               # Build the debug APK
-just emulator-start      # Start emulator (headless)
-just emulator-start headful=true  # Start with visible window
-just test-e2e            # Full E2E test pipeline
-just emulator-status     # Check if emulator is running
-just emulator-stop       # Graceful shutdown (saves snapshot)
+just -l                  # List ALL available commands (authoritative)
+
+# ── Build ──
+just build               # Build release APK (default)
+just build debug         # Build debug APK
+
+# ── Emulator Lifecycle ──
+just emulator-start                     # Start emulator (headless, -no-window)
+just emulator-start headful=true        # Start with visible window
+just emulator-stop                       # Graceful shutdown, cleans up .emulator.pid
+just emulator-restart                    # Stop + start
+just emulator-save-snapshot              # Cold boot + save snapshot for faster future boots
+just emulator-status                     # Show devices, boot state, PID file
+
+# ── Tests ──
+just test                # JVM unit tests (Robolectric), parallel: ./gradlew testDebugUnitTest --parallel
+just test-e2e            # Full E2E: build + install APK + enable IME + verify in IME list
+just test-e2e debug      # E2E using the debug APK
+just test-instrumented   # Espresso instrumented tests on a running emulator
 ```
+
+**Notes:**
+- `just build` runs `cd android && ./gradlew assemble{Variant}` and sets up Java via `sdk env`. Prefer it over calling `./gradlew` directly.
+- `just test` is the canonical way to run unit tests (it sets up the SDK env and passes `--parallel`). Use it instead of a bare `./gradlew testDebugUnitTest`.
+- `just test-e2e` installs `android/app/build/outputs/apk/{variant}/app-{variant}.apk` and enables the Whisper IME; it assumes the emulator is already running (start it first with `just emulator-start`).
 
 ## 2. Use argent MCP tools for emulator interaction
 
