@@ -3,9 +3,9 @@
 # Android SDK location — honors $ANDROID_PATH (set in ~/.config/fish/config.fish),
 # defaults to the developer-machine path when the var is unset.
 android_sdk := env_var_or_default("ANDROID_PATH", "/var/home/l/Android/Sdk")
-# Quote paths to handle spaces in SDK location
-adb := "\"$(android_sdk)/platform-tools/adb\""
-emulator_bin := "\"$(android_sdk)/emulator/emulator\""
+# Quote SDK paths to handle spaces (Just concat — $(...) is shell substitution, not Just interpolation)
+adb := '"' + android_sdk + '/platform-tools/adb"'
+emulator_bin := '"' + android_sdk + '/emulator/emulator"'
 avd := "Pixel_8"
 
 # ── Build ──────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ release branch="":
     echo "==> Triggering Release workflow on branch '$BRANCH'"
     OUT=$(gh workflow run release.yml --ref "$BRANCH" 2>&1)
     echo "$OUT"
-    RUN_ID=$(echo "$OUT" | grep -oE 'run [0-9]+' | grep -oE '[0-9]+' | head -1)
+    RUN_ID=$(echo "$OUT" | grep -oE '(actions/runs/|run )[0-9]+' | grep -oE '[0-9]+' | head -1)
     if [ -z "$RUN_ID" ]; then
         echo "❌ Could not parse workflow run id from gh output" >&2
         exit 1
@@ -259,9 +259,15 @@ setup-hooks:
     #!/usr/bin/env bash
     set -e
     echo "Removing existing hooks..."
-    # Delete all hooks except .sample files
-    # Only remove hooks known to be from hook managers, preserve custom hooks
-    find .git/hooks -type f \( -name 'pre-commit' -o -name 'commit-msg' -o -name 'pre-push' \) ! -name '*.sample' -delete
+    # Remove only pre-commit/commit-msg hooks managed by pre-commit; preserve
+    # any custom hooks instead of deleting them.
+    find .git/hooks -type f \( -name 'pre-commit' -o -name 'commit-msg' \) ! -name '*.sample' -delete
+    # Back up an existing custom pre-push hook so it isn't silently overwritten
+    # by `pre-commit install --hook-type pre-push` below.
+    if [ -f .git/hooks/pre-push ] && ! grep -q "pre-commit" .git/hooks/pre-push 2>/dev/null; then
+        cp .git/hooks/pre-push .git/hooks/pre-push.custom.bak
+        echo "Backed up existing custom pre-push hook to .git/hooks/pre-push.custom.bak"
+    fi
     echo "Installing pre-commit hooks..."
     pre-commit install
     pre-commit install --hook-type commit-msg

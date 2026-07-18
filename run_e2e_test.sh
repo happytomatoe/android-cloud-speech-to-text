@@ -37,8 +37,8 @@
 
 # Use adb/emulator from PATH when present (CI installs the SDK and
 # puts platform-tools on PATH); fall back to the local SDK path.
-ADB="${ADB:-$(command -v adb || echo "$ANDROID_SDK_ROOT/platform-tools/adb")}"
-EMULATOR="${EMULATOR:-$(command -v emulator || echo "$ANDROID_SDK_ROOT/emulator/emulator")}"
+ADB="${ADB:-$(command -v adb || echo "${ANDROID_PATH:-${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}}/platform-tools/adb")}"
+EMULATOR="${EMULATOR:-$(command -v emulator || echo "${ANDROID_PATH:-${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}}/emulator/emulator")}"
 AVD="${AVD:-Pixel_8}"
 PACKAGE="com.example.whispertoinput"
 SERVICE="com.example.whispertoinput/.WhisperInputService"
@@ -450,7 +450,7 @@ tap_rid_via_ui() {
     local node bounds
     # Use xmlstarlet for structural parsing if available, otherwise use grep
     if command -v xmlstarlet >/dev/null 2>&1; then
-        node=$(xmlstarlet sel -t -v "//node[@resource-id='$rid']" "$xml" | head -1)
+        node=$(xmlstarlet sel -t -c "//node[@resource-id='$rid']" "$xml" | head -1)
     else
         node=$(grep "id/$rid" "$xml" | head -1)
     fi
@@ -608,7 +608,7 @@ set_api_key() {
     log_info "Setting API key..."
     # Suppress tracing to avoid exposing API key in debug output
     local old_trace
-    old_trace=$(set +o | grep xtrace | grep -o '[0-9]')
+    old_trace=$([[ $- == *x* ]] && echo 1 || echo 0)
     set +x
     sleep 0.5
 

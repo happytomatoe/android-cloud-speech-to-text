@@ -136,9 +136,9 @@ class WhisperInputService : InputMethodService() {
         CoroutineScope(Dispatchers.Main).launch {
             val autoStart = dataStore.data.map { prefs ->
                 // Default to true to match the settings UI (the auto-recording-start
-                // spinner defaults to "Yes") and this app's purpose as a voice IME, so
-                // a fresh install auto-starts recording when the keyboard is shown
-                // even before the app is first opened.
+                // spinner defaults to "Yes") and this app's purpose as a voice IME.
+                // A fresh install opts into auto-start, but recording only actually
+                // begins once the keyboard is shown AND RECORD_AUDIO is granted.
                 prefs[AUTO_RECORDING_START] ?: true
             }.first()
             if (autoStart

@@ -13,7 +13,10 @@ insert_final_newline = true
 [*.{kt,kts}]
 indent_size = 4
 
-[*.{xml,json,yml,yaml}]
+[*.{xml}]
+indent_size = 4
+
+[*.{json,yml,yaml}]
 indent_size = 2
 
 [*.md]
