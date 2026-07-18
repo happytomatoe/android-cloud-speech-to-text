@@ -494,16 +494,6 @@ apply_settings() {
     sleep 1
 }
 
-enable_test_file_mode() {
-    log_info "Setting test file path..."
-
-    # Test file mode defaults to ON in debug builds — just set the path
-    hs_fill_rid "field_test_file_path" "/data/user/0/$PACKAGE/cache/test-speech-loud.wav"
-    adb_cmd shell input keyevent KEYCODE_BACK
-    sleep 0.5
-    log_ok "Test file path set to app cache"
-}
-
 push_test_audio() {
     log_info "Pushing test audio to emulator app cache..."
     # Push to /data/local/tmp/ then run-as cp into app cache (scoped storage)

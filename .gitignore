@@ -3,3 +3,6 @@
 test-sources/*.wav
 test-sources/*.mp3
 test-sources/*.ogg
+
+# E2E test logs
+e2e_test.log
