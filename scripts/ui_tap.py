@@ -16,8 +16,15 @@ def run(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 def dump():
-    run(f"{ADB} {DEV} shell uiautomator dump /sdcard/ui.xml")
-    return run(f"{ADB} {DEV} shell cat /sdcard/ui.xml").stdout
+    # Stream XML directly to stdout (faster than file I/O)
+    result = run(f"{ADB} {DEV} exec-out uiautomator dump /dev/tty")
+    xml = result.stdout
+    # Strip trailing "UI hierchary dumped to: /dev/tty" message
+    if 'UI hierchary' in xml:
+        xml = xml[:xml.index('UI hierchary')]
+    # Also strip any trailing whitespace/newlines
+    xml = xml.rstrip()
+    return xml
 
 def center(node):
     b = node.get('bounds', '')

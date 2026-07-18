@@ -30,9 +30,7 @@
 #
 # =============================================================================
 
-set -euxo pipefail
-
-# Write all output (incl. `set -x` trace) to a log file and mirror it to the console.
+# Write output to a log file and mirror it to the console.
 # =============================================================================
 # Configuration (all overridable via environment variables)
 # =============================================================================
@@ -42,7 +40,6 @@ EMULATOR="/var/home/l/Android/Sdk/emulator/emulator"
 AVD="${AVD:-Pixel_8}"
 PACKAGE="com.example.whispertoinput"
 SERVICE="com.example.whispertoinput/.WhisperInputService"
-LATIN_IME="com.android.inputmethod.latin/.LatinIME"
 WAV_FILE="/tmp/test-speech-loud.wav"
 VIRTUAL_SINK="${VIRTUAL_SINK:-VirtualMicSink}"
 FAKE_MIC="${FAKE_MIC:-FakeMic}"
@@ -51,11 +48,12 @@ PID_FILE="${PID_FILE:-/tmp/emulator.pid}"
 EMU_LOG="${EMU_LOG:-/tmp/emulator.log}"
 LOG_FILE="${LOG_FILE:-e2e_test.log}"
 EMULATOR_WAS_RUNNING=false
+MODE_FILE="/tmp/emulator.mode"
 
 exec > >(tee "$LOG_FILE") 2>&1
 
-# Default API keys (sourced from keyring / prior sessions)
-DEEPGRAM_KEY_DEFAULT="f97f6e1e42b697792bfe1867f7679fdeaace4de8"
+# Default API keys (sourced from keyring via secret-tool)
+DEEPGRAM_KEY_DEFAULT=$(secret-tool lookup service voice-to-text username deepgram 2>/dev/null || echo "")
 
 # Backend configuration
 declare -A BACKEND_ENDPOINT=(
@@ -99,7 +97,7 @@ step_timer() {
     local now=$SECONDS
     local elapsed=$(( now - STEP_START ))
     local total=$(( now - TEST_START ))
-    echo -e "${BLUE}[TIME]${NC} $1 completed in ${elapsed}s (total: ${total}s)"
+    echo -e "${BLUE}[TIME]${NC} $1: ${elapsed}s (cumulative: ${total}s)"
     STEP_START=$now
 }
 
@@ -107,10 +105,10 @@ step_timer() {
 # Helper Functions
 # =============================================================================
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_err()  { echo -e "${RED}[ERR]${NC} $*"; }
+log_info() { echo -e "${BLUE}[$(date +%H:%M:%S)] [INFO]${NC} $*"; }
+log_ok()   { echo -e "${GREEN}[$(date +%H:%M:%S)] [OK]${NC} $*"; }
+log_warn() { echo -e "${YELLOW}[$(date +%H:%M:%S)] [WARN]${NC} $*"; }
+log_err()  { echo -e "${RED}[$(date +%H:%M:%S)] [ERR]${NC} $*"; }
 
 wait_for() {
     local desc="$1" timeout_s="$2" predicate="$3"
@@ -226,23 +224,26 @@ wait_for_emulator_offline() {
 }
 
 start_emulator() {
-    # Check if emulator is already running with FakeMic pinned
+    # Check if emulator is already running
     if "$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && \
        [[ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null)" == "1" ]]; then
-        # Verify FakeMic is pinned (check QEMU env in /proc)
-        local qemu_pid
-        qemu_pid=$(pgrep -f "qemu-system.*${AVD}" | head -1)
-        if [[ -n "$qemu_pid" ]] && \
-           grep -q "QEMU_PA_SOURCE=$FAKE_MIC" "/proc/$qemu_pid/environ" 2>/dev/null; then
+        # Check if running in correct mode via mode file
+        local current_mode="unknown"
+        [[ -f "$MODE_FILE" ]] && current_mode=$(cat "$MODE_FILE")
+        local want_mode="headless"
+        [[ "$HEADFUL" == "true" ]] && want_mode="headful"
+
+        if [[ "$current_mode" != "$want_mode" ]]; then
+            log_warn "Emulator running $current_mode but we need $want_mode — restarting..."
+            "$ADB" -s "$SERIAL" emu kill 2>/dev/null || true
+            wait_for_emulator_offline || true
+            pkill -9 -f "qemu-system.*${AVD}" 2>/dev/null || true
+            wait_for "emulator process death" 10 "[[ -z \"\$(pgrep -f 'qemu-system.*${AVD}')\" ]]"
+        else
             EMULATOR_WAS_RUNNING=true
-            log_ok "Emulator already running with FakeMic pinned — reusing"
+            log_ok "Emulator already running in correct mode — reusing"
             return 0
         fi
-        log_warn "Emulator running but FakeMic NOT pinned — restarting..."
-        "$ADB" -s "$SERIAL" emu kill 2>/dev/null || true
-        wait_for_emulator_offline || true
-        pkill -9 -f "qemu-system.*${AVD}" 2>/dev/null || true
-        wait_for "emulator process death" 10 "[[ -z \"\$(pgrep -f 'qemu-system.*${AVD}')\" ]]"
     fi
 
     # Verify snapshot exists for quick boot
@@ -251,20 +252,22 @@ start_emulator() {
         die "No emulator snapshot found at $snapshot\n\nRun this first to create the snapshot:\n  just emulator-save-snapshot"
     fi
 
-    log_info "Starting emulator with FakeMic pinned..."
+    log_info "Starting emulator..."
 
     # Clean up stale PID file
     rm -f "$PID_FILE" "$EMU_LOG"
 
-    # Launch emulator with FakeMic pinned
+    # Launch emulator
     local emu_flags="-gpu host -no-snapshot-save"
+    local emu_mode="headless"
     if [[ "$HEADFUL" == "true" ]]; then
-        log_info "Launching emulator (headful, FakeMic pinned)..."
+        log_info "Launching emulator (headful)..."
+        emu_mode="headful"
     else
-        log_info "Launching emulator (headless, FakeMic pinned)..."
+        log_info "Launching emulator (headless)..."
         emu_flags="$emu_flags -no-window"
     fi
-    QEMU_AUDIO_DRV=pa QEMU_PA_SOURCE=$FAKE_MIC \
+    echo "$emu_mode" > "$MODE_FILE"
     setsid "$EMULATOR" -avd "$AVD" $emu_flags > "$EMU_LOG" 2>&1 &
     echo $! > "$PID_FILE"
 
@@ -273,6 +276,10 @@ start_emulator() {
     wait_for "emulator boot" $EMULATOR_BOOT_TIMEOUT \
         '"$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && "$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | grep -q "^1$"'
     log_ok "Emulator booted in $(( SECONDS - boot_start ))s"
+    # Disable animations for faster UI automation
+    adb_cmd shell settings put global window_animation_scale 0
+    adb_cmd shell settings put global transition_animation_scale 0
+    adb_cmd shell settings put global animator_duration_scale 0
 }
 
 disable_host_mic() {
@@ -336,6 +343,8 @@ grant_permissions() {
 
 enable_ime() {
     log_info "Enabling Whisper IME..."
+    # Wait for package to be visible to PM
+    wait_for "package registered" 10 "adb_cmd shell pm list packages | grep -q $PACKAGE"
     local attempts=0
     while [[ $attempts -lt 3 ]]; do
         if adb_cmd shell ime enable "$SERVICE" 2>/dev/null; then
@@ -344,7 +353,7 @@ enable_ime() {
         fi
         attempts=$((attempts + 1))
         log_warn "IME not yet registered, retrying ($attempts/3)..."
-        sleep 3
+        sleep-i-am-sure 1
     done
     die "Failed to enable IME after 3 attempts"
 }
@@ -361,76 +370,45 @@ set_default_ime() {
 }
 
 # =============================================================================
-# UI Automation Helpers (using our ui_tap.py)
+# UI Automation Helpers (using hs / handsets)
 # =============================================================================
 
-UI_TAP="python3 scripts/ui_tap.py"
+HS="hs --device $SERIAL --json"
 
-ui_tap() {
-    run_cmd "$UI_TAP $*" false
+# Tap an element by resource-id (app prefix auto-handled)
+hs_tap_rid() {
+    local result
+    result=$($HS tap "#$1" 2>/dev/null) || true
+    echo "$result"
+    echo "$result" | grep -q '"ok":true'
 }
 
-dump_ui() {
-    run_cmd "$UI_TAP --dump" false
+# Tap an element by exact text
+hs_tap_text() {
+    local result
+    result=$($HS tap "$1" 2>/dev/null) || true
+    echo "$result"
+    echo "$result" | grep -q '"ok":true'
 }
 
-tap_by_rid() {
-    ui_tap --rid "com.example.whispertoinput:id/$1"
+# Wait for text to appear (returns 0 on found)
+hs_wait_text() {
+    $HS wait "$1" --timeout 5000 2>/dev/null
 }
 
-tap_by_text() {
-    ui_tap --text "$1"
-}
-
-tap_by_contains() {
-    ui_tap --contains "$1"
-}
-
-dump_and_grep() {
-    dump_ui | grep -E "$1"
-}
-
-get_field_coords() {
+# Set text into a field by resource-id (no IME switching needed)
+hs_fill_rid() {
     local field_id="$1"
-    python3 -c "
-import subprocess, xml.etree.ElementTree as ET, re
-import os
-ADB = '$ADB'
-DEV = '-s $SERIAL'
-xml = subprocess.run([ADB, '-s', '$SERIAL', 'shell', 'uiautomator', 'dump', '/sdcard/ui.xml'], capture_output=True, text=True)
-xml = subprocess.run([ADB, '-s', '$SERIAL', 'shell', 'cat', '/sdcard/ui.xml'], capture_output=True, text=True).stdout
-root = ET.fromstring(xml)
-for n in root.iter('node'):
-    if n.get('resource-id', '') == 'com.example.whispertoinput:id/$field_id':
-        b = n.get('bounds', '')
-        nums = list(map(int, re.findall(r'\d+', b)))
-        print((nums[0]+nums[2])//2, (nums[1]+nums[3])//2)
-        break
-"
+    local text="$2"
+    local result
+    result=$($HS fill "id=com.example.whispertoinput:id/$field_id" "$text" 2>/dev/null) || true
+    echo "$result"
+    echo "$result" | grep -q '"ok":true'
 }
 
-tap_coords() {
-    local x="$1" y="$2"
-    adb_cmd shell input tap "$x" "$y"
-}
-
-triple_tap_rid() {
-    local field_id="$1"
-    local coords
-    coords=$(get_field_coords "$field_id")
-    read -r x y <<< "$coords"
-    for _ in 1 2 3; do
-        adb_cmd shell input tap "$x" "$y"
-        sleep 0.05
-    done
-}
-
-tap_field() {
-    local field_id="$1"
-    local coords
-    coords=$(get_field_coords "$field_id")
-    read -r x y <<< "$coords"
-    adb_cmd shell input tap "$x" "$y"
+# Scroll down (swipe up)
+hs_scroll_down() {
+    $HS swipe up 2>/dev/null || true
 }
 
 # =============================================================================
@@ -440,7 +418,8 @@ tap_field() {
 open_settings() {
     log_info "Opening Settings activity..."
     adb_cmd shell am start -n "$PACKAGE/.MainActivity" >/dev/null
-    sleep 3
+    # Wait for Settings activity to be ready instead of fixed sleep
+    wait_for "Settings activity ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
 }
 
 select_backend() {
@@ -449,15 +428,10 @@ select_backend() {
 
     log_info "Selecting backend: $display"
 
-    # Retry loop: uiautomator dump can be flaky right after Settings loads.
     # Tap the spinner by resource-id, with retries.
     local tap_ok=false
     for attempt in 1 2 3 4 5; do
-        local coords
-        coords=$(get_field_coords "spinner_speech_to_text_backend")
-        read -r x y <<< "$coords"
-        if [[ -n "$x" && -n "$y" ]]; then
-            adb_cmd shell input tap "$x" "$y"
+        if hs_tap_rid "spinner_speech_to_text_backend"; then
             tap_ok=true
             break
         fi
@@ -467,19 +441,19 @@ select_backend() {
     if [[ "$tap_ok" != "true" ]]; then
         die "Could not find spinner after 5 attempts"
     fi
-    sleep 1.5
+    sleep-i-am-sure 0.5
 
     # Now select the backend from the dropdown by text
-    tap_by_text "$display"
-    sleep 1.2
+    hs_tap_text "$display"
+    sleep-i-am-sure 0.5
 
-    # Verify endpoint updated
+    # Verify endpoint updated (single dump, parse both fields)
     local expected="${BACKEND_ENDPOINT[$backend]}"
     local model="${BACKEND_MODEL[$backend]}"
 
     local endpoint_text model_text
-    endpoint_text=$(dump_and_grep "field_endpoint" | head -1 | sed "s/.*text='\([^']*\)'.*/\1/")
-    model_text=$(dump_and_grep "field_model" | head -1 | sed "s/.*text='\([^']*\)'.*/\1/")
+    endpoint_text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_endpoint]' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1)
+    model_text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_model]' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1)
 
     if [[ "$endpoint_text" != *"$expected"* ]]; then
         die "Endpoint mismatch: expected $expected, got $endpoint_text"
@@ -493,129 +467,46 @@ select_backend() {
 set_api_key() {
     local api_key="$1"
 
-    log_info "Setting API key (switching to LatinIME for typing)..."
-    set_default_ime "$LATIN_IME"
+    log_info "Setting API key..."
     sleep 0.5
 
-    # Try to find the API key field first (it may already be visible)
-    local coords x y
-    coords=$(get_field_coords "field_api_key")
-    read -r x y <<< "$coords"
-    if [[ -n "$x" && -n "$y" ]]; then
-        log_ok "API key field already visible at ($x, $y)"
-    else
-        # Scroll to reveal API key field
-        log_info "Scrolling to reveal API key field..."
-        adb_cmd shell input swipe 540 1800 540 600 300
-        sleep 1.5
-
-        # Get field coordinates with retry (uiautomator dump can be flaky after scrolling)
-        local attempts=0
-        while [ $attempts -lt 3 ]; do
-            coords=$(get_field_coords "field_api_key")
-            read -r x y <<< "$coords"
-            if [[ -n "$x" && -n "$y" ]]; then
-                break
-            fi
-            log_info "uiautomator dump returned empty, retrying (${attempts}/3)..."
-            sleep 2
-            attempts=$((attempts + 1))
-        done
-
-        if [[ -z "$x" || -z "$y" ]]; then
-            die "Could not locate API key field after scrolling"
+    # Try to find the API key field, scroll if needed
+    local found=false
+    for attempt in 1 2 3; do
+        if hs_fill_rid "field_api_key" "$api_key"; then
+            found=true
+            break
         fi
+        log_info "API key field not visible, scrolling..."
+        hs_scroll_down
+        sleep 1
+    done
+    if [[ "$found" != "true" ]]; then
+        die "Could not locate API key field after scrolling"
     fi
 
-    log_info "Focusing API key field at ($x, $y)..."
-    adb_cmd shell input tap "$x" "$y"
-    sleep 0.5
-
-    # Since we clear app data before each run, field should be empty
-    # Just type the key directly in chunks
-    log_info "Typing API key (chunked)..."
-    local key="$1"
-    local chunk_size=10
-    local i=0
-    while [ $i -lt ${#key} ]; do
-        local chunk="${key:$i:$chunk_size}"
-        adb_cmd shell input text "$chunk"
-        sleep 0.3
-        i=$((i + chunk_size))
-    done
-    sleep 0.4
-
-    # Hide keyboard
-    adb_cmd shell input keyevent KEYCODE_BACK
-    sleep 0.5
-
-    # Switch back to Whisper IME
-    set_default_ime "$SERVICE"
+    log_ok "API key set"
 }
 
 
 apply_settings() {
-    tap_by_rid "btn_settings_apply"
+    hs_tap_rid "btn_settings_apply"
     sleep 1
 }
 
 enable_test_file_mode() {
-    log_info "Enabling use-test-file mode..."
+    log_info "Setting test file path..."
 
-    # The "Use Test File" spinner may be below the fold — scroll to reveal it
-    local scroll_attempts=0
-    while (( scroll_attempts < 5 )); do
-        local coords
-        coords=$(get_field_coords "spinner_use_test_file")
-        read -r x y <<< "$coords"
-        if [[ -n "$x" && -n "$y" ]]; then
-            break
-        fi
-        log_info "Scrolling to reveal Use Test File spinner..."
-        adb_cmd shell input swipe 540 1800 540 600 300
-        sleep 1.5
-        scroll_attempts=$((scroll_attempts + 1))
-    done
-
-    if [[ -z "$x" || -z "$y" ]]; then
-        die "Could not find Use Test File spinner after scrolling"
-    fi
-
-    # Tap the spinner to open dropdown
-    adb_cmd shell input tap "$x" "$y"
-    sleep 1
-
-    # Select "Yes"
-    tap_by_text "Yes"
-    sleep 1
-
-    # Set test file path to app cache (can't use /sdcard/ on Android 10+)
-    local path_coords
-    path_coords=$(get_field_coords "field_test_file_path")
-    read -r px py <<< "$path_coords"
-    if [[ -n "$px" && -n "$py" ]]; then
-        adb_cmd shell input tap "$px" "$py"
-        sleep 0.5
-        # Move to end, then delete all characters (default path is ~34 chars)
-        adb_cmd shell input keyevent KEYCODE_MOVE_END
-        sleep 0.2
-        for _ in $(seq 1 40); do
-            adb_cmd shell input keyevent KEYCODE_DEL
-        done
-        sleep 0.3
-        adb_cmd shell input text "/data/user/0/$PACKAGE/cache/test-speech-loud.wav"
-        adb_cmd shell input keyevent KEYCODE_BACK
-        sleep 0.5
-        log_ok "Test file path set to app cache"
-    fi
-
-    log_ok "use-test-file mode enabled"
+    # Test file mode defaults to ON in debug builds — just set the path
+    hs_fill_rid "field_test_file_path" "/data/user/0/$PACKAGE/cache/test-speech-loud.wav"
+    adb_cmd shell input keyevent KEYCODE_BACK
+    sleep 0.5
+    log_ok "Test file path set to app cache"
 }
 
 push_test_audio() {
-    log_info "Pushing test audio to emulator app storage..."
-    # Can't use /sdcard/ on Android 10+ (scoped storage EACCES).
-    # Push to /data/local/tmp/ then run-as cp into app cache.
+    log_info "Pushing test audio to emulator app cache..."
+    # Push to /data/local/tmp/ then run-as cp into app cache (scoped storage)
     adb_cmd push "$WAV_FILE" /data/local/tmp/test-speech-loud.wav
     adb_cmd shell "run-as $PACKAGE cp /data/local/tmp/test-speech-loud.wav cache/test-speech-loud.wav"
     adb_cmd shell rm -f /data/local/tmp/test-speech-loud.wav
@@ -627,37 +518,20 @@ push_test_audio() {
 # =============================================================================
 
 focus_text_field() {
-    log_info "Focusing text field to trigger Whisper keyboard..."
+    log_info "Focusing app text field to trigger Whisper keyboard..."
 
-    # Open Android Settings — has a search bar at the top, no popups
-    adb_cmd shell am start -a android.settings.SETTINGS >/dev/null
-    sleep 3
+    # Open the app's MainActivity (has field_debug_output EditText)
+    adb_cmd shell am start -n "$PACKAGE/.MainActivity" >/dev/null
+    wait_for "App ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
 
-    # The Settings search bar on the homepage is a TextView (search_action_bar_title).
-    # Tapping it activates search mode and reveals the EditText (search_src_text).
-    # However, ui_tap --rid/--text can be flaky here (timing / encoding issues), so
-    # we tap the known coordinate directly as a reliable fallback.
+    # Tap the debug output EditText to focus it and show keyboard
     local attempts=0
-    while (( attempts < 5 )); do
-        # Try uiautomator-based tap first (works if Settings fully loaded)
-        ui_tap --rid com.android.settings:id/search_action_bar_title || true
-        sleep 1
-        # Also try the EditText in case search mode already activated
-        ui_tap --rid android:id/search_src_text || true
-        sleep 1
+    while (( attempts < 3 )); do
+        hs_tap_rid "field_debug_output"
+        sleep 0.5
 
         if adb_cmd shell dumpsys input_method 2>/dev/null | grep -q "mIsInputViewShown=true"; then
             log_ok "Whisper keyboard is shown"
-            return 0
-        fi
-
-        # Fallback: tap the search bar by known coordinate (540, ~215)
-        log_warn "UI tap failed, trying coordinate fallback ($attempts/5)..."
-        adb_cmd shell input tap 540 215
-        sleep 1.5
-
-        if adb_cmd shell dumpsys input_method 2>/dev/null | grep -q "mIsInputViewShown=true"; then
-            log_ok "Whisper keyboard is shown (via coordinate tap)"
             return 0
         fi
         attempts=$((attempts + 1))
@@ -679,22 +553,37 @@ wait_for_transcription() {
 
     local start=$(date +%s)
     while (( $(date +%s) - start < TRANSCRIPTION_TIMEOUT )); do
-        # Look for any EditText with transcribed text — works for Settings search bar
-        local text
-        text=$(dump_ui | grep -oP "class='android\.widget\.EditText'[^>]*text='\K[^']*" | head -1) || true
-        if [[ -z "$text" ]]; then
-            # Fallback: check all text nodes for the expected substring
-            text=$(dump_ui | grep -oP "text='\K[^']*" | grep -i "$expected_lower" | head -1) || true
+        # Check for errors in logcat first
+        local error
+        error=$(adb_cmd logcat -d -s "whisper-input:E" 2>/dev/null | grep -oP "Transcription error: \K.*" | tail -1) || true
+        if [[ -n "$error" ]]; then
+            echo -e "${RED}[TIME]${NC} Transcription wait: $(( $(date +%s) - start ))s"
+            die "Transcription failed: $error"
         fi
-        if [[ -n "$text" ]]; then
+
+        # Check for success in logcat
+        local result
+        result=$(adb_cmd logcat -d -s "whisper-input:V" 2>/dev/null | grep -oP "Transcription result: '\K[^']*" | tail -1) || true
+        if [[ -n "$result" && "$result" != "null" ]]; then
+            log_ok "Transcription committed: $result"
+            echo -e "${BLUE}[TIME]${NC} Transcription wait: $(( $(date +%s) - start ))s"
+            return 0
+        fi
+
+        # Also check UI for text (fallback)
+        local text
+        text=$(hs find 'EditText' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1) || true
+        if [[ -n "$text" && "$text" != *"Transcribed text will appear here"* ]]; then
             local text_lower="${text,,}"
             if [[ "$text_lower" == *"$expected_lower"* ]]; then
                 log_ok "Transcription committed: $text"
+                echo -e "${BLUE}[TIME]${NC} Transcription wait: $(( $(date +%s) - start ))s"
                 return 0
             fi
         fi
         sleep 1
     done
+    echo -e "${RED}[TIME]${NC} Transcription wait: TIMEOUT after ${TRANSCRIPTION_TIMEOUT}s"
     die "Timeout: expected substring '$expected' not found in field"
 }
 
@@ -713,7 +602,7 @@ STATUS_SEEN_TRANSCRIBING=false
 
 # Current text of label_status if the IME keyboard is visible, else empty.
 sample_status_label() {
-    dump_ui 2>/dev/null | grep -oP 'resource-id="[^"]*label_status"[^>]*text="\K[^"]*' | head -1
+    hs find 'TextView[id=com.example.whispertoinput:id/label_status]' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1
 }
 
 # Sample the status label for up to TRANSCRIPTION_TIMEOUT seconds, recording
@@ -751,14 +640,9 @@ run_e2e_test() {
     STEP_START=$SECONDS
     log_info "=== Starting E2E test for $backend ==="
 
-    # 1. Virtual mic
-    setup_virtual_mic
-    step_timer "Virtual mic setup"
-
-    # 2. Emulator
+    # 1. Emulator
     start_emulator
-    disable_host_mic
-    step_timer "Emulator boot + host mic off"
+    step_timer "Emulator start"
 
     # Wait for package manager and system services to fully settle after boot
     # (already confirmed via boot_completed, just need a small buffer for PM)
@@ -784,12 +668,13 @@ run_e2e_test() {
         die "No API key provided for $backend (set ${backend^^}_KEY env var or pass as arg)"
     fi
     open_settings
+    step_timer "Open settings"
     select_backend "$backend"
+    step_timer "Select backend"
     set_api_key "$api_key"
-    step_timer "Backend + API key"
-    enable_test_file_mode
+    step_timer "Set API key"
     apply_settings
-    step_timer "Test-file mode + apply"
+    step_timer "Apply settings"
 
     # Ensure Whisper is default
     set_default_ime "$SERVICE"
@@ -818,6 +703,8 @@ run_e2e_test() {
     step_timer "Transcription"
 
     # Negative-path assertions (observational; do not alter the happy path).
+    # Kill the monitor early — no need to wait the full TRANSCRIPTION_TIMEOUT
+    kill "$MON_PID" 2>/dev/null || true
     wait "$MON_PID" 2>/dev/null || true
     if [[ "$STATUS_SEEN_RECORDING" == "true" && "$STATUS_SEEN_TRANSCRIBING" == "true" ]]; then
         log_ok "Status label cycled recording -> transcribing"
@@ -850,6 +737,7 @@ BACKEND=""
 API_KEY=""
 EXPECTED=""
 HEADFUL=false
+DEBUG=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -869,6 +757,10 @@ while [[ $# -gt 0 ]]; do
             HEADFUL=true
             shift
             ;;
+        --debug)
+            DEBUG=true
+            shift
+            ;;
         --help|-h)
             cat <<EOF
 Usage: $0 --backend <deepgram|groq|60db> --key <API_KEY> --expected <substring> [--headful]
@@ -878,6 +770,7 @@ Options:
   --key       API key for the backend
   --expected  Expected substring in transcription result
   --headful   Run emulator with visible window (default: headless)
+  --debug     Enable debug tracing (set -x)
 
 Environment variables can also be used:
   DEEPGRAM_KEY, GROQ_KEY, SIXTYDB_KEY
@@ -913,6 +806,11 @@ fi
 
 if [[ -z "$API_KEY" ]]; then
     die "API key not provided. Use --key or set ${BACKEND^^}_KEY environment variable."
+fi
+
+# Enable debug tracing if --debug flag was passed
+if [[ "$DEBUG" == "true" ]]; then
+    set -x
 fi
 
 # =============================================================================

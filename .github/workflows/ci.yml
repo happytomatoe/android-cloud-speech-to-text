@@ -5,8 +5,9 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  test-all:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -29,14 +30,41 @@ jobs:
           restore-keys: |
             robolectric-sdk-
 
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --parallel
-        working-directory: android
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install handsets (hs)
+        run: |
+          gh release download v0.1.38 -R elliotgao2/handsets \
+            --pattern handsets-linux-x86_64.tar.gz -D /tmp/hs-dl
+          mkdir -p ~/.local/bin
+          tar xzf /tmp/hs-dl/handsets-linux-x86_64.tar.gz -C ~/.local/bin --strip-components=1
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+      - name: Run all tests (unit + E2E)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: Pixel 7
+          emulator-options: '-no-window -gpu swiftshader_indirect -noaudio -no-snapshot-save'
+          disable-animations: true
+          script: |
+            just test-all
+        env:
+          DEEPGRAM_KEY: ${{ secrets.DEEPGRAM_KEY }}
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-reports
-          path: android/app/build/reports/tests/testDebugUnitTest
+          name: test-reports
+          path: |
+            android/app/build/reports/tests/testDebugUnitTest
+            e2e_test.log
           retention-days: 7

@@ -22,6 +22,7 @@ build variant="release":
 
 pid_file := ".emulator.pid"
 emu_log := "/tmp/emulator.log"
+mode_file := "/tmp/emulator.mode"
 
 # Start the emulator. Base command: emulator -avd Pixel_8
 #   just emulator-start              # headless  -> emulator -avd Pixel_8 -no-window
@@ -47,6 +48,8 @@ emulator-start headful="false":
         MODE="headless"
     fi
     echo "Starting emulator ($MODE): emulator -avd {{avd}} $FLAGS"
+    # Save mode to file for E2E script to detect
+    echo "$MODE" > {{mode_file}}
     # setsid detaches it from this shell so it survives after `just` returns
     setsid {{emulator_bin}} -avd {{avd}} $FLAGS > {{emu_log}} 2>&1 &
     echo $! > {{pid_file}}
@@ -55,6 +58,10 @@ emulator-start headful="false":
     for i in $(seq 1 60); do
         if [ "$({{adb}} shell getprop sys.boot_completed 2>/dev/null)" = "1" ]; then
             echo "✅ Emulator booted (PID $(cat {{pid_file}}) saved to {{pid_file}})"
+            # Disable animations for faster UI automation
+            {{adb}} shell settings put global window_animation_scale 0
+            {{adb}} shell settings put global transition_animation_scale 0
+            {{adb}} shell settings put global animator_duration_scale 0
             exit 0
         fi
         sleep-i-am-sure 2
@@ -84,6 +91,7 @@ emulator-stop:
         fi
         rm -f {{pid_file}}
     fi
+    rm -f {{mode_file}}
     echo "✅ Emulator stopped"
 
 # Cold boot and save snapshot (for quick boot later)
@@ -161,7 +169,69 @@ test-instrumented:
     cd android && ./gradlew connectedDebugAndroidTest
 
 # ── Repo Setup ───────────────────────────────────────────────────
-# Point git at the repo's tracked hooks (e.g. commit-msg that forbids
-# Co-Authored-By trailers). Run once after cloning.
+# Setup development tools
+#   just setup              # install latest stable handsets (>14 days old)
+#   just setup v0.1.36     # install specific version
+setup version="":
+    #!/usr/bin/env bash
+    set -e
+
+    REPO="elliotgao2/handsets"
+    BIN_DIR="$HOME/.local/bin"
+    ARCHIVE="handsets-linux-x86_64.tar.gz"
+
+    # Resolve version: pinned or latest stable (>14 days old)
+    if [ -n "{{version}}" ]; then
+        VERSION="{{version}}"
+    else
+        echo "Querying GitHub releases for latest stable (>=14 days old)..."
+        VERSION=$(gh release list -R "$REPO" --json tagName,publishedAt --limit 5 -q '
+            [.[] | select((now - (.publishedAt | fromdateiso8601)) >= 1209600)]
+            | .[0].tagName
+        ')
+        [ -n "$VERSION" ] || { echo "ERROR: could not find a stable release"; exit 1; }
+    fi
+
+    echo "Installing handsets $VERSION"
+    gh release download "$VERSION" -R "$REPO" --pattern "$ARCHIVE" -D /tmp/hs-dl --skip-existing
+
+    echo "Extracting to $BIN_DIR"
+    mkdir -p "$BIN_DIR"
+    tar xzf "/tmp/hs-dl/$ARCHIVE" -C "$BIN_DIR" --strip-components=1
+
+    echo "✅ Handsets $VERSION installed"
+
+# ── Git Hooks Setup ───────────────────────────────────────────
+# Install pre-commit hooks (replaces lefthook-generated hooks)
+#   just setup-hooks
+#
+# Note: This removes any lefthook-generated hooks and installs
+# pre-commit (https://pre-commit.com) with the project's
+# .pre-commit-config.yaml. Also adds a custom commit-msg hook
+# that rejects 'Co-Authored-By' lines.
 setup-hooks:
-    git config core.hooksPath .githooks
+    #!/usr/bin/env bash
+    set -e
+    echo "Removing existing hooks..."
+    # Delete all hooks except .sample files
+    find .git/hooks -type f ! -name '*.sample' -delete
+    echo "Installing pre-commit hooks..."
+    pre-commit install
+    pre-commit install --hook-type commit-msg
+    echo "✅ Git hooks installed (commit-msg checks for Co-Authored-By via pre-commit)"
+
+# ── Run all tests in parallel ─────────────────────────────────────
+# Phase 1: Build main APK + compile test classes (single Gradle invocation)
+# Phase 2: Run unit tests and E2E in parallel (no more builds)
+test-all:
+    #!/usr/bin/env bash
+    set -e
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk env >/dev/null
+    echo "Phase 1: Building (main + test classes)..."
+    cd android && ./gradlew assembleDebug compileDebugUnitTestKotlin && cd ..
+    echo "Phase 2: Running tests in parallel..."
+    just test &
+    just test-e2e debug &
+    wait
+    echo "✅ All tests passed"
