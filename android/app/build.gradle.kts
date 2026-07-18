@@ -78,4 +78,10 @@ tasks.withType<Test> {
     // Run test classes concurrently across forks to cut total test time.
     // Pair with `./gradlew test --parallel` for cross-module parallelism.
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    // Fork a fresh JVM per test class. Robolectric leaks Android/looper/coroutine
+    // state across test classes that share a fork, which deadlocks
+    // buildActivity()/DataStore-driven setup on later classes (e.g.
+    // MainActivitySettingsTest hangs after ExampleUnitTest in a reused JVM).
+    // A fresh JVM per class keeps each class hermetic and the suite reliable.
+    forkEvery = 1
 }
