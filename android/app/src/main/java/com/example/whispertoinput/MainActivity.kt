@@ -48,6 +48,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -75,6 +76,14 @@ val TEST_FILE_PATH = stringPreferencesKey("test-file-path")
 
 class MainActivity : AppCompatActivity() {
     private var setupSettingItemsDone: Boolean = false
+
+    /**
+     * Completes once [setupSettingItems] has finished populating all settings.
+     * Tests can await this instead of polling a side-effect field.
+     */
+    @androidx.annotation.VisibleForTesting
+    val settingsReady = CompletableDeferred<Unit>()
+
     // Set once the user taps Apply, so the enable-keyboard prompt only appears on request.
     private var keyboardPromptRequested: Boolean = false
 
@@ -273,11 +282,6 @@ class MainActivity : AppCompatActivity() {
                 val btnApply: Button = findViewById(R.id.btn_settings_apply)
                 val editText = findViewById<EditText>(viewId)
                 editText.isEnabled = false
-                editText.doOnTextChanged { _, _, _, _ ->
-                    if (!setupSettingItemsDone) return@doOnTextChanged
-                    isDirty = true
-                    btnApply.isEnabled = true
-                }
 
                 // Read data. If none, apply default value.
                 val settingValue: String? = readSetting(preferenceKey)
@@ -287,6 +291,11 @@ class MainActivity : AppCompatActivity() {
                 }
                 editText.setText(value)
                 editText.isEnabled = true
+                editText.doOnTextChanged { _, _, _, _ ->
+                    if (!setupSettingItemsDone) return@doOnTextChanged
+                    isDirty = true
+                    btnApply.isEnabled = true
+                }
             }
         }
         override suspend fun apply() {
@@ -514,6 +523,7 @@ class MainActivity : AppCompatActivity() {
             }
             settingItems.map { settingItem -> settingItem.setup() }.joinAll()
             setupSettingItemsDone = true
+            settingsReady.complete(Unit)
         }
     }
 }
