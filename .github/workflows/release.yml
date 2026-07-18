@@ -100,7 +100,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
+          # Suffix with the CI run id so every run yields a fresh, visible release
+          # (repo releases are immutable, so the tag must be unique per run).
+          TAG="v${{ steps.version.outputs.version }}-${{ github.run_id }}"
           gh release create "$TAG" --prerelease --title "Canary $TAG" --generate-notes --target "${{ github.sha }}"
 
       - name: Release (from main)
