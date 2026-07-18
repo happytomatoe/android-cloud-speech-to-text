@@ -36,4 +36,4 @@ repos:
         entry: bash -c 'just test-all'
         language: system
         pass_filenames: false
-        stages: [push]
+        stages: [pre-push]
