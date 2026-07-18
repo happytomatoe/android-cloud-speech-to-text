@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      version:
+        description: "Release version (e.g. 0.6.4). Used when dispatched manually."
+        required: false
+        default: "0.6.4"
       branch:
         description: "Branch to run the release against (used by 'just release' via --ref)"
         required: false
@@ -18,7 +22,11 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
+    # On push, skip if the commit message opts out. On manual dispatch, always run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!contains(github.event.head_commit.message, 'ci skip') &&
+       !contains(github.event.head_commit.message, 'skip ci'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,21 +44,43 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Setup Node
+      # ----- Manual dispatch: pinned version + attach APK -----
+      - name: Build Release APK
+        if: github.event_name == 'workflow_dispatch'
+        run: ./gradlew assembleRelease --no-daemon --parallel --build-cache -PVERSION_NAME="${{ github.event.inputs.version }}"
+        working-directory: android
+
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes \
+            android/app/build/outputs/apk/release/app-release.apk
+
+      # ----- Push to main: auto shipit -----
+      - name: Setup Node (auto only)
+        if: github.event_name == 'push'
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
           cache: 'npm'
 
-      - name: Install auto and plugins
+      - name: Install auto and plugins (auto only)
+        if: github.event_name == 'push'
         run: |
           npm install -g auto @auto-it/upload-assets
 
-      - name: Build Release APK
+      - name: Build Release APK (auto)
+        if: github.event_name == 'push'
         run: ./gradlew assembleRelease --no-daemon --parallel --build-cache
         working-directory: android
 
-      - name: Release
+      - name: Release (auto shipit)
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: auto shipit
