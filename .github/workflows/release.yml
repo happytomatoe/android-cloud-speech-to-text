@@ -47,26 +47,60 @@ jobs:
 
       - name: Compute release version
         id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BASE_TAG=$(git describe --tags --abbrev=0)
           BASE="${BASE_TAG#v}"
           SHA=$(git rev-parse --short HEAD)
-          VERSION="${BASE}-SNAPSHOT-${SHA}"
+          BRANCH="${{ github.ref_name }}"
+          if [ "$BRANCH" = "main" ]; then
+            # Real release from main: let auto compute the next semver from PR labels.
+            BUMP=$(auto version 2>/dev/null | tail -1)
+            case "$BUMP" in major|minor|patch) ;; *) BUMP=patch ;; esac
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+              *)     PATCH=$((PATCH+1)) ;;
+            esac
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            PRERELEASE=""
+          else
+            # Canary/snapshot from a branch: stamp snapshot + unique commit id.
+            VERSION="${BASE}-SNAPSHOT-${SHA}"
+            PRERELEASE="--prerelease"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Release version: ${VERSION}"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VERSION} (prerelease: ${PRERELEASE:-none})"
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon --parallel --build-cache -PVERSION_NAME="${{ steps.version.outputs.version }}"
         working-directory: android
 
-      - name: Upload APK as workflow artifact
+      - name: Upload APK as workflow artifact (canary)
+        if: github.ref_name != 'main'
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ steps.version.outputs.version }}
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
+      - name: Upload APK as workflow artifact (release)
+        if: github.ref_name == 'main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ steps.version.outputs.version }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+
       - name: Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: auto shipit --use-version "${{ steps.version.outputs.version }}" --prerelease --base-branch "${{ github.ref_name }}"
+        run: |
+          if [ "${{ steps.version.outputs.branch }}" = "main" ]; then
+            auto shipit
+          else
+            auto shipit --use-version "${{ steps.version.outputs.version }}" --prerelease --base-branch "${{ github.ref_name }}"
+          fi
