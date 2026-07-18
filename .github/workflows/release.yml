@@ -45,7 +45,7 @@ jobs:
         id: current
         run: |
           VERSION_NAME=$(grep 'versionName' android/app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep '^[[:space:]]*versionCode' android/app/build.gradle.kts | sed 's/.*= *[0-9]*\).*/\1/')
+          VERSION_CODE=$(grep '^[[:space:]]*versionCode' android/app/build.gradle.kts | sed 's/.*= *\([0-9]*\).*/\1/')
           echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "📌 Current: $VERSION_NAME (code: $VERSION_CODE)"
