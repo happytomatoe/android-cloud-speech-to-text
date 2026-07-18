@@ -59,14 +59,7 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon --parallel --build-cache -PVERSION_NAME="${{ steps.version.outputs.version }}"
         working-directory: android
 
-      - name: Upload APK as workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-${{ steps.version.outputs.version }}
-          path: android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 30
-
       - name: Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: auto shipit --use-version "${{ steps.version.outputs.version }}" --prerelease --base-branch "${{ github.ref_name }}"
+        run: auto shipit --use-version "${{ steps.version.outputs.version }}" --prerelease
