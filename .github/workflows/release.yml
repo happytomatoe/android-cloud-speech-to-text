@@ -95,16 +95,13 @@ jobs:
           name: app-release-${{ steps.version.outputs.version }}
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      - name: Release (canary from branch)
-        if: github.ref_name != 'main'
+      - name: Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          gh release create "$TAG" --prerelease --title "Canary $TAG" --generate-notes --target "${{ github.sha }}"
-
-      - name: Release (from main)
-        if: github.ref_name == 'main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: auto shipit
+          if [ "${{ steps.version.outputs.branch }}" = "main" ]; then
+            auto shipit
+          else
+            # Canary/snapshot from a branch: prerelease only, no commit/tag push of a version.
+            auto shipit --prerelease
+          fi
