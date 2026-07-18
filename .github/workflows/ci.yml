@@ -70,7 +70,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          target: google_atd
+          target: default
           arch: x86_64
           profile: pixel_7
           emulator-options: '-no-window -gpu swiftshader -noaudio -no-snapshot-save'
@@ -80,11 +80,6 @@ jobs:
             just test-all
         env:
           DEEPGRAM_KEY: ${{ secrets.DEEPGRAM_KEY }}
-          # Headless-optimised ATD image + generous heap/disk reduce the
-          # intermittent "error: closed" (emulator goes unresponsive mid-test)
-          # seen on github-hosted Linux runners.
-          EMULATOR_HEAP_SIZE: 2048M
-          EMULATOR_DISK_SIZE: 12GB
 
       - name: Upload test reports
         if: always()
