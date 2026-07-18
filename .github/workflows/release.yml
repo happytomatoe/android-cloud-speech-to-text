@@ -3,18 +3,6 @@ name: Release
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: 'Version bump type'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-          - skip
 
 permissions:
   contents: write
@@ -24,6 +12,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,83 +30,21 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Get current version
-        id: current
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install auto and plugins
         run: |
-          VERSION_NAME=$(grep 'versionName' android/app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'versionCode' android/app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
-          echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "📌 Current: $VERSION_NAME (code: $VERSION_CODE)"
-
-      - name: Calculate new version
-        id: new
-        run: |
-          CURRENT="${{ steps.current.outputs.name }}"
-          BUMP="${{ inputs.bump }}"
-
-          if [ "$BUMP" = "skip" ]; then
-            echo "⏭️ Skipping release"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-
-          case "$BUMP" in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-            *)
-              echo "⚠️ Unknown bump: $BUMP, defaulting to patch"
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          NEW_CODE=$((${{ steps.current.outputs.code }} + 1))
-
-          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "code=$NEW_CODE" >> "$GITHUB_OUTPUT"
-          echo "🏷️ New version: $NEW_VERSION (code: $NEW_CODE)"
-
-      - name: Update version in build.gradle.kts
-        if: steps.new.outputs.skip != 'true'
-        run: |
-          sed -i "s/versionName = \"${{ steps.current.outputs.name }}\"/versionName = \"${{ steps.new.outputs.version }}\"/" android/app/build.gradle.kts
-          sed -i "s/versionCode = ${{ steps.current.outputs.code }}/versionCode = ${{ steps.new.outputs.code }}/" android/app/build.gradle.kts
-          echo "✅ Updated build.gradle.kts"
+          npm install -g auto @auto-it/upload-assets
 
       - name: Build Release APK
-        if: steps.new.outputs.skip != 'true'
         run: ./gradlew assembleRelease --no-daemon --parallel --build-cache
         working-directory: android
 
-      - name: Create GitHub Release
-        if: steps.new.outputs.skip != 'true'
+      - name: Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.new.outputs.version }}"
-          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
-
-          # Create tag
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
-
-          # Create release with APK
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --generate-notes \
-            "$APK_PATH#whisper-to-input-v$VERSION.apk"
-
-          echo "🎉 Released v$VERSION"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: auto shipit
