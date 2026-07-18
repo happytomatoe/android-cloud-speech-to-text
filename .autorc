@@ -1,7 +1,6 @@
 {
   "plugins": [
     "git-tag",
-    ["upload-assets", { "assets": ["android/app/build/outputs/apk/release/app-release.apk"] }],
     "released"
   ],
   "labels": [
