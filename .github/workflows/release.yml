@@ -112,6 +112,7 @@ jobs:
 
           # Create tag
           git tag -f "v$VERSION"
+          git push -f origin :refs/tags/v$VERSION 2>/dev/null || true
           git push -f origin "v$VERSION"
 
           # Create release with APK
