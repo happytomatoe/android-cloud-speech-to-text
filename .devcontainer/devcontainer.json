@@ -1,7 +1,12 @@
 {
   "name": "Whisper To Input (Android)",
 
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+  // postCreateCommand is split into bisect halves (see NOTE below).
+  // HALF 1 (this revision): base runtimes + pi coding agent. Fast (~2-3 min).
+  // HALF 2 (next): Android SDK, emulator, just, hs, pre-commit, project hooks.
+  // pi is installed into a user-owned npm prefix (~/.npm-global) so it lands on
+  // PATH without sudo (the default universal image's nvm prefix is root-owned).
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends openjdk-17-jdk-headless unzip curl git ca-certificates python3-pip && npm config set prefix \"$HOME/.npm-global\" && export PATH=\"$HOME/.npm-global/bin:$PATH\" && npm install -g @earendil-works/pi-coding-agent && printf 'export PATH=\"$HOME/.npm-global/bin:$PATH\"\\n' >> \"$HOME/.bashrc\"",
 
   "customizations": {
     "vscode": {
@@ -29,6 +34,6 @@
   //   GitHub Codespaces provides native SSH tunneling only on the default
   //   universal image. Pinning a custom `image` (or adding the `sshd`
   //   devcontainer feature) breaks `gh codespace ssh` (Permission denied).
-  //   All tooling (JDK, Android SDK, pi, …) is installed by setup.sh, so we
-  //   deliberately use the default image and keep this file minimal.
+  //   All tooling is installed by postCreateCommand, so we deliberately use the
+  //   default image and keep this file minimal + bisectable.
 }
