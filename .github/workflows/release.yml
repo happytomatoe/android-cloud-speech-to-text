@@ -45,11 +45,21 @@ jobs:
         run: |
           npm install -g auto @auto-it/upload-assets
 
+      - name: Compute release version
+        id: version
+        run: |
+          BASE_TAG=$(git describe --tags --abbrev=0)
+          BASE="${BASE_TAG#v}"
+          SHA=$(git rev-parse --short HEAD)
+          VERSION="${BASE}-SNAPSHOT-${SHA}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VERSION}"
+
       - name: Build Release APK
-        run: ./gradlew assembleRelease --no-daemon --parallel --build-cache
+        run: ./gradlew assembleRelease --no-daemon --parallel --build-cache -PVERSION_NAME="${{ steps.version.outputs.version }}"
         working-directory: android
 
       - name: Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: auto shipit
+        run: auto shipit --use-version "${{ steps.version.outputs.version }}" --prerelease

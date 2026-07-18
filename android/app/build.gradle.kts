@@ -3,9 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Git-based versioning: main gets exact tag, dev branches get -SNAPSHOT.
+// Git-based versioning: main gets exact tag, dev branches get -SNAPSHOT-<sha>.
 // Resilient to missing git metadata (shallow clone, dubious ownership) so the
 // build never fails purely because version probing could not run.
+// The CI release workflow overrides this with -PVERSION_NAME (snapshot + unique id).
 fun gitOutputOr(fallback: String, vararg args: String): String =
     runCatching {
         providers.exec { commandLine("git", *args) }
@@ -13,9 +14,14 @@ fun gitOutputOr(fallback: String, vararg args: String): String =
     }.getOrDefault(fallback)
 
 val gitVersionName: String = run {
-    val tag = gitOutputOr("0.0.0", "describe", "--tags", "--abbrev=0")
-    val branch = gitOutputOr("dev", "rev-parse", "--abbrev-ref", "HEAD")
-    if (branch == "main") tag else "$tag-SNAPSHOT"
+    if (project.hasProperty("VERSION_NAME")) {
+        project.property("VERSION_NAME") as String
+    } else {
+        val tag = gitOutputOr("0.0.0", "describe", "--tags", "--abbrev=0")
+        val branch = gitOutputOr("dev", "rev-parse", "--abbrev-ref", "HEAD")
+        val sha = gitOutputOr("dirty", "rev-parse", "--short", "HEAD")
+        if (branch == "main") tag else "$tag-SNAPSHOT-$sha"
+    }
 }
 
 val gitVersionCode: Int = run {
