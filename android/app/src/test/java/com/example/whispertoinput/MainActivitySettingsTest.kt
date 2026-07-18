@@ -36,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -63,6 +64,27 @@ class MainActivitySettingsTest {
 
     private val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    // Hold the last built activity so each test tears it down. Without this, the
+    // previous test's MainActivity (and its Dispatchers.Main setup coroutines /
+    // Robolectric looper state) leaks into the next test, which deadlocks
+    // buildActivity().setup() on the second activity.
+    private var currentActivity: MainActivity? = null
+
+    @After
+    fun tearDown() {
+        // MainActivity launches fire-and-forget coroutines on Dispatchers.Main
+        // (setup + Apply's DataStore writes). finished() resets Dispatchers.Main,
+        // which would orphan any in-flight write and block the NEXT test's
+        // DataStore read (deadlock on the second buildActivity). Flush the rule's
+        // scheduler to run those coroutines, then read the DataStore: a read
+        // blocks until any in-flight write commits, giving a clean handoff.
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
+        runBlocking(Dispatchers.IO) { ctx.dataStore.data.first() }
+        currentActivity?.finish()
+        currentActivity = null
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+    }
+
     // Establish a clean, known config so the activity's auto-fill assertions are
     // deterministic regardless of what other test classes left in the shared
     // DataStore (e.g. WhisperTranscriberTest pointing ENDPOINT at a dead server).
@@ -80,17 +102,20 @@ class MainActivitySettingsTest {
         }
     }
 
-    // buildActivity(...).setup() triggers async DataStore reads; wait until the
-    // endpoint field has been auto-filled (the clearest "setup finished" signal).
+    // buildActivity(...).setup() triggers async DataStore reads on Dispatchers.Main
+    // that auto-fill the fields; flush the scheduler (repeating so resumed IO
+    // continuations also run) until the endpoint field is populated.
     private fun buildAndWait(): MainActivity {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-        val endpoint = activity.findViewById<EditText>(R.id.field_endpoint)
-        val deadline = System.currentTimeMillis() + 15_000
+        currentActivity = activity
+        // Await the production completion signal — no polling, no side-effect fields.
+        val deadline = System.currentTimeMillis() + 10_000
         while (System.currentTimeMillis() < deadline) {
-            if (!endpoint.text.isNullOrEmpty()) return activity
-            Thread.sleep(50)
+            mainRule.dispatcher.scheduler.advanceUntilIdle()
+            if (activity.settingsReady.isCompleted) return activity
+            Thread.sleep(10) // let IO continuations resume between scheduler advances
         }
-        throw AssertionError("MainActivity setup did not populate the endpoint field in time")
+        throw AssertionError("MainActivity settings setup did not complete in time")
     }
 
     private fun selectBackend(activity: MainActivity, displayName: String) {
@@ -150,21 +175,28 @@ class MainActivitySettingsTest {
         val activity = buildAndWait()
         val endpoint = activity.findViewById<EditText>(R.id.field_endpoint)
 
-        // Mutate the field; the text-watcher marks the setting dirty (setup is done by now).
         val newValue = "https://example.com/custom-endpoint"
         endpoint.setText(newValue)
+
+        // CRITICAL: drain the scheduler so the TextWatcher fires and sets isDirty=true
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
         // Tap Apply.
         activity.findViewById<android.widget.Button>(R.id.btn_settings_apply)
             .performClick()
 
-        // The write happens on a DataStore IO dispatcher; poll until it lands.
+        // The Apply coroutine runs on Dispatchers.Main, then writeSetting() suspends
+        // on Dispatchers.IO (real thread). We need to pump: advance the scheduler,
+        // then let IO progress, until the write lands.
         val deadline = System.currentTimeMillis() + 10_000
         var stored: String? = null
         while (System.currentTimeMillis() < deadline) {
+            mainRule.dispatcher.scheduler.advanceUntilIdle()   // run Main trigger + coroutine
+            shadowOf(android.os.Looper.getMainLooper()).idle() // drain Robolectric looper
             stored = runBlocking(Dispatchers.IO) { ctx.dataStore.data.first()[ENDPOINT] }
             if (stored == newValue) break
-            Thread.sleep(50)
+            Thread.sleep(20) // let DataStore IO thread finish
         }
         assertEquals("Apply should persist the edited endpoint to DataStore", newValue, stored)
     }
@@ -175,6 +207,9 @@ class MainActivitySettingsTest {
         // Robolectric reports no enabled IMEs by default.
         activity.findViewById<android.widget.Button>(R.id.btn_settings_apply)
             .performClick()
+
+        // Apply's visibility update runs on Dispatchers.Main; flush it.
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
 
         val link = activity.findViewById<android.widget.TextView>(R.id.link_enable_keyboard)
         assertEquals(
@@ -212,6 +247,9 @@ class MainActivitySettingsTest {
 
         activity.findViewById<android.widget.Button>(R.id.btn_settings_apply)
             .performClick()
+
+        // Apply's visibility update runs on Dispatchers.Main; flush it.
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
 
         val link = activity.findViewById<android.widget.TextView>(R.id.link_enable_keyboard)
         assertEquals(
