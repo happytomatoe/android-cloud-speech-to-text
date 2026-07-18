@@ -170,3 +170,15 @@ Minimum code that solves the problem. Nothing speculative.
 ## 9. Surgical Changes
 
 Touch only what you must. Don't refactor adjacent code.
+
+## 10. No background processes unless asked
+
+Run commands in the **foreground** by default. Do not spawn background processes, daemons, `nohup`/`setsid`/`&` jobs, or tmux sessions unless the user explicitly asks for it.
+
+**Why:** A foreground run keeps the full command lifecycle (output, exit code, cleanup/`trap`) inside one tool call where it can be observed and verified. Background launches hide failures, detach from the calling shell, and make it easy to lose the result or leave orphaned processes (emulators, gradle daemons, hs daemons) running.
+
+**If a command is genuinely long-running** (e.g. a full build + emulator boot + E2E that exceeds the bash timeout), say so and ask the user whether they want it backgrounded — don't decide unilaterally.
+
+# Notes for agents
+
+- `sleep-i-am-sure` is a real project binary (in `~/.local/bin`, on PATH). It is **intentional**, not a typo for `sleep` — use it wherever a delay is needed (the no-bare-`sleep` extension blocks plain `sleep`).
