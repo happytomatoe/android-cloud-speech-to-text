@@ -184,14 +184,14 @@ test-e2e variant="release": (build variant)
 # org.gradle.parallel=true).
 # Full transcription E2E: build, install, drive the app via hs, and verify
 # the STT result (test-file mode) against an expectation. Requires a running
-# emulator and DEEPGRAM_KEY in the environment.
+# emulator. API key is retrieved from secret-tool (service voice-to-text).
 test-e2e-transcribe:
     #!/usr/bin/env bash
     set -e
     # sdkman exists only on developer machines; CI uses actions/setup-java.
     [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
     command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
-    ./run_e2e_test.sh --backend deepgram --key "${DEEPGRAM_KEY:?DEEPGRAM_KEY must be set}" --expected "hello world"
+    ./run_e2e_test.sh --backend deepgram --expected "hello world"
 
 test:
     #!/usr/bin/env bash
