@@ -35,8 +35,10 @@
 # Configuration (all overridable via environment variables)
 # =============================================================================
 
-ADB="/var/home/l/Android/Sdk/platform-tools/adb"
-EMULATOR="/var/home/l/Android/Sdk/emulator/emulator"
+# Use adb/emulator from PATH when present (CI installs the SDK and
+# puts platform-tools on PATH); fall back to the local SDK path.
+ADB="$(command -v adb || echo /var/home/l/Android/Sdk/platform-tools/adb)"
+EMULATOR="$(command -v emulator || echo /var/home/l/Android/Sdk/emulator/emulator)"
 AVD="${AVD:-Pixel_8}"
 PACKAGE="com.example.whispertoinput"
 SERVICE="com.example.whispertoinput/.WhisperInputService"
@@ -173,8 +175,20 @@ setup_virtual_mic() {
     log_ok "Virtual mic sources created"
 }
 
+capture_diag() {
+    local out="${1:-e2e_diag.png}"
+    log_warn "Capturing diagnostic screenshot -> $out"
+    "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
+        || "$ADB" -s "$SERIAL" shell screencap -p > "$out" 2>/dev/null \
+        || log_warn "screencap failed (emulator may not be reachable)"
+}
+
 cleanup_virtual_mic() {
     log_info "Cleaning up virtual mic modules..."
+    # pactl (PulseAudio) only exists on developer machines; the CI
+    # runner has no audio stack. Safe to skip there (setup_virtual_mic
+    # is never called in test-file mode anyway).
+    command -v pactl >/dev/null 2>&1 || { log_warn "pactl not available — skipping virtual mic cleanup"; return 0; }
     # Unload each matching module individually (grep may return multiple IDs)
     for pattern in "$VIRTUAL_SINK" "$FAKE_MIC"; do
         pactl list short modules | grep "$pattern" | awk '{print $1}' | while read -r mid; do
@@ -233,7 +247,9 @@ start_emulator() {
         local want_mode="headless"
         [[ "$HEADFUL" == "true" ]] && want_mode="headful"
 
-        if [[ "$current_mode" != "$want_mode" ]]; then
+        # If we didn't start this emulator ourselves (no mode file, e.g. an
+        # externally-managed CI emulator), reuse it as-is instead of restarting.
+        if [[ -f "$MODE_FILE" && "$current_mode" != "$want_mode" ]]; then
             log_warn "Emulator running $current_mode but we need $want_mode — restarting..."
             "$ADB" -s "$SERIAL" emu kill 2>/dev/null || true
             wait_for_emulator_offline || true
@@ -326,7 +342,11 @@ clear_app_data() {
 
 build_and_install() {
     log_info "Building and installing APK..."
-    export JAVA_HOME="${HOME}/.sdkman/candidates/java/17.0.13-tem"
+    # Prefer an already-configured JAVA_HOME (CI sets it via actions/setup-java);
+    # fall back to the local sdkman install on developer machines.
+    if [[ -z "${JAVA_HOME:-}" ]]; then
+        export JAVA_HOME="${HOME}/.sdkman/candidates/java/17.0.13-tem"
+    fi
     cd android
     run_cmd "./gradlew assembleDebug"
     cd ..
@@ -409,6 +429,14 @@ hs_fill_rid() {
 # Scroll down (swipe up)
 hs_scroll_down() {
     $HS swipe up 2>/dev/null || true
+}
+
+# Start the hs daemon (connects to the device). Required in CI before any hs
+# verb; on a dev machine it's a safe no-op if the daemon is already up.
+hs_daemon_start() {
+    log_info "Starting hs daemon..."
+    hs --device "$SERIAL" use >/dev/null 2>&1 || hs use >/dev/null 2>&1 || true
+    log_ok "hs daemon ready"
 }
 
 # =============================================================================
@@ -548,6 +576,7 @@ wait_for_transcription() {
         error=$(adb_cmd logcat -d -s "whisper-input:E" 2>/dev/null | grep -oP "Transcription error: \K.*" | tail -1) || true
         if [[ -n "$error" ]]; then
             echo -e "${RED}[TIME]${NC} Transcription wait: $(( $(date +%s) - start ))s"
+            capture_diag
             die "Transcription failed: $error"
         fi
 
@@ -574,6 +603,7 @@ wait_for_transcription() {
         sleep 1
     done
     echo -e "${RED}[TIME]${NC} Transcription wait: TIMEOUT after ${TRANSCRIPTION_TIMEOUT}s"
+    capture_diag
     die "Timeout: expected substring '$expected' not found in field"
 }
 
@@ -637,6 +667,9 @@ run_e2e_test() {
     # Wait for package manager and system services to fully settle after boot
     # (already confirmed via boot_completed, just need a small buffer for PM)
     wait_for "package manager ready" 5 'adb_cmd shell pm list packages >/dev/null 2>&1'
+
+    # Start the UI-automation daemon before driving the app.
+    hs_daemon_start
 
     # 3. App
     clear_app_data

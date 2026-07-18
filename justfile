@@ -152,11 +152,22 @@ test-e2e variant="release": (build variant)
 # Runs Tiers 1-3 JVM tests: keyboard state machine, backspace, transcriber, services.
 # `just test` runs them with cross-module parallelism enabled (see gradle.properties:
 # org.gradle.parallel=true).
+# Full transcription E2E: build, install, drive the app via hs, and verify
+# the STT result (test-file mode) against an expectation. Requires a running
+# emulator and DEEPGRAM_KEY in the environment.
+test-e2e-transcribe:
+    #!/usr/bin/env bash
+    set -e
+    # sdkman exists only on developer machines; CI uses actions/setup-java.
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+    command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
+    ./run_e2e_test.sh --backend deepgram --key "${DEEPGRAM_KEY:?DEEPGRAM_KEY must be set}" --expected "hello world"
+
 test:
     #!/usr/bin/env bash
     set -e
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk env >/dev/null
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+    command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
     cd android && ./gradlew testDebugUnitTest --parallel
 
 # ── Instrumented Tests (Espresso, on a running emulator) ──────────
@@ -226,12 +237,18 @@ setup-hooks:
 test-all:
     #!/usr/bin/env bash
     set -e
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk env >/dev/null
-    echo "Phase 1: Building (main + test classes)..."
-    cd android && ./gradlew assembleDebug compileDebugUnitTestKotlin && cd ..
-    echo "Phase 2: Running tests in parallel..."
-    just test &
-    just test-e2e debug &
-    wait
+    # sdkman exists only on developer machines; CI uses actions/setup-java.
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+    command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
+    echo "Phase 1: Compiling unit-test classes..."
+    cd android && ./gradlew compileDebugUnitTestKotlin && cd ..
+    echo "Phase 2: Running unit + E2E tests in parallel..."
+    just test & TEST_PID=$!
+    just test-e2e-transcribe & E2E_PID=$!
+    wait "$TEST_PID"; local test_rc=$?
+    wait "$E2E_PID"; local e2e_rc=$?
+    if [[ "$test_rc" -ne 0 || "$e2e_rc" -ne 0 ]]; then
+        echo "❌ Tests failed (unit rc=$test_rc, e2e rc=$e2e_rc)"
+        exit 1
+    fi
     echo "✅ All tests passed"
