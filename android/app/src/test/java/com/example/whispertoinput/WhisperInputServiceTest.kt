@@ -94,21 +94,18 @@ class WhisperInputServiceTest {
         wrapper.broadcastReceiver.onReceive(app, Intent(WhisperInputService.ACTION_TOGGLE_RECORDING))
     }
 
-    private fun settle(ms: Long = 600) = Thread.sleep(ms)
+    private fun settle() = mainRule.dispatcher.scheduler.advanceUntilIdle()
 
     @Test
     fun permission_denied_launches_main_activity() {
         val service = buildService()
         toggle(service)
 
+        // The permission check + startActivity run on Dispatchers.Main; flush it.
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
+
         val shadowApp = shadowOf(RuntimeEnvironment.getApplication()) as ShadowApplication
-        val deadline = System.currentTimeMillis() + 10_000
-        var intent: Intent? = null
-        while (System.currentTimeMillis() < deadline) {
-            intent = shadowApp.nextStartedActivity
-            if (intent != null) break
-            Thread.sleep(50)
-        }
+        val intent = shadowApp.nextStartedActivity
         assertNotNull("denied permissions should launch MainActivity", intent)
         assertEquals(MainActivity::class.java.name, intent!!.component?.className)
     }
@@ -135,13 +132,19 @@ class WhisperInputServiceTest {
 
         val service = buildService()
         toggle(service) // first tap: start test-file recording
-        settle()        // let the dataStore coroutine settle before the second tap
+        settle()        // flush Main coroutine (reads USE_TEST_FILE) before the second tap
         toggle(service) // second tap: transcribe against MockWebServer
+        settle()        // flush the Main coroutine that kicks off transcription
 
+        // The transcription network call runs on a real IO thread (MockWebServer/
+        // OkHttp), but the success callback runs on Dispatchers.Main, which is the
+        // StandardTestDispatcher — so it is QUEUED and only runs when the scheduler
+        // is advanced. Pump: advance the scheduler, then let real IO progress.
         val deadline = System.currentTimeMillis() + 15_000
         while (System.currentTimeMillis() < deadline) {
+            mainRule.dispatcher.scheduler.advanceUntilIdle()   // run Main trigger + callback
             if (WhisperInputService.lastTranscriptionResult != null) break
-            Thread.sleep(50)
+            Thread.sleep(50)                                    // let MockWebServer IO finish
         }
         assertEquals("hello world", WhisperInputService.lastTranscriptionResult)
         assertNull(WhisperInputService.lastTranscriptionError)

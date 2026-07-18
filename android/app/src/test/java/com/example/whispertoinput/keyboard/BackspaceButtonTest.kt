@@ -47,13 +47,18 @@ class BackspaceButtonTest {
         val btn = BackspaceButton(ctx(), attrs())
         var count = 0
         btn.setBackspaceCallback { count++ }
-        btn.dispatchTouchEvent(down())                 // count=1 + starts long-press detector
-        mainRule.dispatcher.scheduler.advanceTimeBy(600) // crosses DELAY_BEFORE_QUICK_BACKSPACE
-        mainRule.dispatcher.scheduler.advanceTimeBy(80)  // quick backspace #1
-        mainRule.dispatcher.scheduler.advanceTimeBy(80)  // quick backspace #2
+        btn.dispatchTouchEvent(down())                    // count=1 (performClick) + queues detector launch
+        mainRule.dispatcher.scheduler.runCurrent()         // run queued launch → reaches delay(600)
+        mainRule.dispatcher.scheduler.advanceTimeBy(600)   // cross DELAY_BEFORE_QUICK_BACKSPACE
+        mainRule.dispatcher.scheduler.runCurrent()         // flush resumed first repeat (count=2)
+        mainRule.dispatcher.scheduler.advanceTimeBy(80)    // cross first 80ms
+        mainRule.dispatcher.scheduler.runCurrent()         // flush repeat #2 (count=3)
+        mainRule.dispatcher.scheduler.advanceTimeBy(80)    // cross second 80ms
+        mainRule.dispatcher.scheduler.runCurrent()         // flush repeat #3 (count=4)
         assertEquals("initial tap + 3 repeats", 4, count)
-        btn.dispatchTouchEvent(up())                   // abort detector
+        btn.dispatchTouchEvent(up())                       // abort detector
         mainRule.dispatcher.scheduler.advanceTimeBy(1000)
+        mainRule.dispatcher.scheduler.runCurrent()
         assertEquals("no repeats after lift", 4, count)
     }
 }

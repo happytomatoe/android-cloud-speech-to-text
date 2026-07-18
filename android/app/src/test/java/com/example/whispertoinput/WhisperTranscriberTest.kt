@@ -38,8 +38,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * Verifies [WhisperTranscriber]: per-backend request building (auth scheme +
@@ -97,30 +95,43 @@ class WhisperTranscriberTest {
         return f.absolutePath
     }
 
-    // Waits for the success callback (the transcription text); ignores the error callback.
+    // Waits for the success callback by pumping the Main dispatcher scheduler
+    // while letting MockWebServer respond on its real IO thread. Under
+    // StandardTestDispatcher the transcription callback is queued on Main and
+    // only runs when the scheduler is advanced; the network itself runs on a
+    // real thread, so a short real-time sleep lets it complete between pumps.
     private fun transcribeExpectingResult(attachToEnd: String): String? {
         var result: String? = null
-        val latch = CountDownLatch(1)
         WhisperTranscriber().startAsync(
             ctx, fakeWav(), "audio/wav", attachToEnd,
-            { result = it; latch.countDown() },
+            { result = it },
             { /* error path is irrelevant for success tests */ }
         )
-        latch.await(30, TimeUnit.SECONDS)
+        pumpUntil { result != null }
         return result
     }
 
     // Waits for the error callback; ignores the (null) success callback.
     private fun transcribeExpectingError(attachToEnd: String): String? {
         var error: String? = null
-        val latch = CountDownLatch(1)
         WhisperTranscriber().startAsync(
             ctx, fakeWav(), "audio/wav", attachToEnd,
             { /* success path irrelevant for error tests */ },
-            { error = it; latch.countDown() }
+            { error = it }
         )
-        latch.await(30, TimeUnit.SECONDS)
+        pumpUntil { error != null }
         return error
+    }
+
+    // Advances the virtual-time scheduler and lets the real IO thread (MockWebServer)
+    // make progress, until the predicate holds or a 30s deadline elapses.
+    private fun pumpUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < deadline) {
+            mainRule.dispatcher.scheduler.advanceUntilIdle() // run queued Main trigger + callback
+            if (condition()) return
+            Thread.sleep(20)                                 // let MockWebServer IO finish
+        }
     }
 
     private fun voxtral() = ctx.getString(R.string.settings_option_voxtral)
