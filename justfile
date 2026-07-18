@@ -3,8 +3,9 @@
 # Android SDK location — honors $ANDROID_PATH (set in ~/.config/fish/config.fish),
 # defaults to the developer-machine path when the var is unset.
 android_sdk := env_var_or_default("ANDROID_PATH", "/var/home/l/Android/Sdk")
-adb := android_sdk + "/platform-tools/adb"
-emulator_bin := android_sdk + "/emulator/emulator"
+# Quote paths to handle spaces in SDK location
+adb := "\"$(android_sdk)/platform-tools/adb\""
+emulator_bin := "\"$(android_sdk)/emulator/emulator\""
 avd := "Pixel_8"
 
 # ── Build ──────────────────────────────────────────────────────────
@@ -226,7 +227,7 @@ setup version="":
         VERSION="{{version}}"
     else
         echo "Querying GitHub releases for latest stable (>=14 days old)..."
-        VERSION=$(gh release list -R "$REPO" --json tagName,publishedAt --limit 5 -q '
+        VERSION=$(gh release list -R "$REPO" --exclude-drafts --exclude-pre-releases --json tagName,publishedAt --limit 20 -q '
             [.[] | select((now - (.publishedAt | fromdateiso8601)) >= 1209600)]
             | .[0].tagName
         ')
@@ -234,11 +235,14 @@ setup version="":
     fi
 
     echo "Installing handsets $VERSION"
-    gh release download "$VERSION" -R "$REPO" --pattern "$ARCHIVE" -D /tmp/hs-dl --skip-existing
+    # Use per-run temp dir to avoid reusing old archives
+    DOWNLOAD_DIR=$(mktemp -d)
+    trap "rm -rf $DOWNLOAD_DIR" EXIT
+    gh release download "$VERSION" -R "$REPO" --pattern "$ARCHIVE" -D "$DOWNLOAD_DIR"
 
     echo "Extracting to $BIN_DIR"
     mkdir -p "$BIN_DIR"
-    tar xzf "/tmp/hs-dl/$ARCHIVE" -C "$BIN_DIR" --strip-components=1
+    tar xzf "$DOWNLOAD_DIR/$ARCHIVE" -C "$BIN_DIR" --strip-components=1
 
     echo "✅ Handsets $VERSION installed"
 
@@ -255,7 +259,8 @@ setup-hooks:
     set -e
     echo "Removing existing hooks..."
     # Delete all hooks except .sample files
-    find .git/hooks -type f ! -name '*.sample' -delete
+    # Only remove hooks known to be from hook managers, preserve custom hooks
+    find .git/hooks -type f \( -name 'pre-commit' -o -name 'commit-msg' -o -name 'pre-push' \) ! -name '*.sample' -delete
     echo "Installing pre-commit hooks..."
     pre-commit install
     pre-commit install --hook-type commit-msg
@@ -275,8 +280,10 @@ test-all:
     echo "Phase 2: Running unit + E2E tests in parallel..."
     just test & TEST_PID=$!
     just test-e2e-transcribe & E2E_PID=$!
-    wait "$TEST_PID"; local test_rc=$?
-    wait "$E2E_PID"; local e2e_rc=$?
+    test_rc=0
+    e2e_rc=0
+    wait "$TEST_PID" || test_rc=$?
+    wait "$E2E_PID" || e2e_rc=$?
     if [[ "$test_rc" -ne 0 || "$e2e_rc" -ne 0 ]]; then
         echo "❌ Tests failed (unit rc=$test_rc, e2e rc=$e2e_rc)"
         exit 1

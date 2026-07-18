@@ -505,7 +505,7 @@ class MainActivity : AppCompatActivity() {
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
                 ), true) else null,
-                if (BuildConfig.DEBUG) SettingText(R.id.field_test_file_path, TEST_FILE_PATH, "/data/user/0/${packageName}/cache/test-speech-loud.wav") else null,
+                if (BuildConfig.DEBUG) SettingText(R.id.field_test_file_path, TEST_FILE_PATH, cacheDir.resolve("test-speech-loud.wav").absolutePath) else null,
             ).filterNotNull()
             val btnApply: Button = findViewById(R.id.btn_settings_apply)
             btnApply.isEnabled = false

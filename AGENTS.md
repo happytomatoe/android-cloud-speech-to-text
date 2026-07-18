@@ -87,8 +87,8 @@ XML gives exact text, bounds, and resource-ids — no OCR needed, faster than sc
 hs use                          # start daemon (needs adb in PATH)
 hs ui                           # flat table of tappable nodes
 hs tap "Continue"               # find by text, tap centre
-hs tap #back_btn                # find by resource-id, tap centre
-hs fill 'EditText[resource-id=com.example:id/field]' "text"  # atomic ACTION_SET_TEXT
+hs tap '\#back_btn'                # find by resource-id, tap centre
+hs fill 'id=com.example:id/field' 'text'  # atomic ACTION_SET_TEXT
 hs wait "Welcome"               # wait for text to appear
 hs drop                         # tear down daemon
 ```
@@ -173,7 +173,7 @@ Touch only what you must. Don't refactor adjacent code.
 
 ## 10. No background processes unless asked
 
-Run commands in the **foreground** by default. Do not spawn background processes, daemons, `nohup`/`setsid`/`&` jobs, or tmux sessions unless the user explicitly asks for it.
+Run commands in the **foreground** by default. Do not spawn background processes, daemons, `nohup`/`setsid`/`&` jobs, or tmux sessions unless the user explicitly asks for it. Project-required daemons such as `hs use` may be started by canonical workflow commands and must be cleaned up afterward.
 
 **Why:** A foreground run keeps the full command lifecycle (output, exit code, cleanup/`trap`) inside one tool call where it can be observed and verified. Background launches hide failures, detach from the calling shell, and make it easy to lose the result or leave orphaned processes (emulators, gradle daemons, hs daemons) running.
 

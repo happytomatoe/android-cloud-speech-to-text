@@ -37,8 +37,8 @@
 
 # Use adb/emulator from PATH when present (CI installs the SDK and
 # puts platform-tools on PATH); fall back to the local SDK path.
-ADB="$(command -v adb || echo /var/home/l/Android/Sdk/platform-tools/adb)"
-EMULATOR="$(command -v emulator || echo /var/home/l/Android/Sdk/emulator/emulator)"
+ADB="${ADB:-$(command -v adb || echo "$ANDROID_SDK_ROOT/platform-tools/adb")}"
+EMULATOR="${EMULATOR:-$(command -v emulator || echo "$ANDROID_SDK_ROOT/emulator/emulator")}"
 AVD="${AVD:-Pixel_8}"
 PACKAGE="com.example.whispertoinput"
 SERVICE="com.example.whispertoinput/.WhisperInputService"
@@ -111,7 +111,7 @@ log_info() { echo -e "${BLUE}[$(date +%H:%M:%S)] [INFO]${NC} $*"; }
 
 # Portable sleep: CI runners have plain `sleep`; some dev shells shadow it
 # with a `sleep-i-am-sure` guard. Fall back so the same script runs in both.
-ssleep() { command sleep "$@" 2>/dev/null || sleep-i-am-sure "$@" 2>/dev/null || true; }
+ssleep() { command sleep "$@" 2>/dev/null || sleep-i-am-sure "$@" 2>/dev/null || die "No usable sleep command available"; }
 log_ok()   { echo -e "${GREEN}[$(date +%H:%M:%S)] [OK]${NC} $*"; }
 log_warn() { echo -e "${YELLOW}[$(date +%H:%M:%S)] [WARN]${NC} $*"; }
 log_err()  { echo -e "${RED}[$(date +%H:%M:%S)] [ERR]${NC} $*"; }
@@ -190,16 +190,18 @@ capture_diag() {
     log_warn "Capturing diagnostic screenshot -> $out"
     # Prefer adb screencap — it needs no UiAutomation/daemon, so it works
     # whenever the emulator is reachable (even if the hs daemon is down).
-    "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
+    "$ADB" -s "$SERIAL" exec-out screencap -p > "$out" 2>/dev/null \
         || hs --device "$SERIAL" see --size 768 "$out" 2>/dev/null \
         || "$ADB" -s "$SERIAL" shell screencap -p > "$out" 2>/dev/null \
         || log_warn "screenshot failed (emulator may not be reachable)"
 
     # Also dump the UI hierarchy as XML (text-based, easy to grep/inspect
     # for the exact node/resource-id that was missing at failure time).
+    # Redact sensitive fields (API keys) before saving
     local xml="${out%.png}.xml"
     "$ADB" -s "$SERIAL" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 \
         && "$ADB" -s "$SERIAL" pull /sdcard/ui.xml "$xml" >/dev/null 2>&1 \
+        && sed -i '/resource-id=".*field_api_key"/s/text="[^"]*"//' "$xml" 2>/dev/null \
         && log_warn "Captured diagnostic UI hierarchy -> $xml" \
         || log_warn "ui dump failed (emulator may not be reachable)"
 }
@@ -259,6 +261,10 @@ wait_for_emulator_offline() {
 }
 
 start_emulator() {
+    # Disable animations for all emulators (newly started or reused)
+    "$ADB" -s "$SERIAL" shell settings put global window_animation_scale 0 2>/dev/null || true
+    "$ADB" -s "$SERIAL" shell settings put global transition_animation_scale 0 2>/dev/null || true
+    "$ADB" -s "$SERIAL" shell settings put global animator_duration_scale 0 2>/dev/null || true
     # Check if emulator is already running
     if "$ADB" -s "$SERIAL" get-state >/dev/null 2>&1 && \
        [[ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null)" == "1" ]]; then
@@ -418,10 +424,17 @@ HS="hs --device $SERIAL --json"
 
 # Tap an element by resource-id (app prefix auto-handled)
 hs_tap_rid() {
+    local rid="$1"
     local result
-    result=$($HS tap "#$1" 2>/dev/null) || true
+    result=$($HS tap "#$rid" 2>/dev/null) || true
     echo "$result"
-    echo "$result" | grep -q '"ok":true'
+    if echo "$result" | grep -q '"ok":true'; then
+        return 0
+    fi
+    # Fallback: try UI-based tap
+    log_warn "hs tap failed for #$rid, trying UI fallback..."
+    tap_rid_via_ui "$rid"
+    return $?
 }
 
 # Tap a view by resource-id via uiautomator dump + input tap. More robust
@@ -435,7 +448,12 @@ tap_rid_via_ui() {
         && "$ADB" -s "$SERIAL" pull /sdcard/ui.xml "$xml" >/dev/null 2>&1 \
         || { rm -f "$xml"; return 1; }
     local node bounds
-    node=$(grep "id/$rid" "$xml" | head -1)
+    # Use xmlstarlet for structural parsing if available, otherwise use grep
+    if command -v xmlstarlet >/dev/null 2>&1; then
+        node=$(xmlstarlet sel -t -v "//node[@resource-id='$rid']" "$xml" | head -1)
+    else
+        node=$(grep "id/$rid" "$xml" | head -1)
+    fi
     bounds=$(echo "$node" | grep -oP 'bounds="\K\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]')
     rm -f "$xml"
     [[ -z "$bounds" ]] && return 1
@@ -447,7 +465,7 @@ tap_rid_via_ui() {
     cx=$(( (x1 + x2) / 2 ))
     cy=$(( (y1 + y2) / 2 ))
     "$ADB" -s "$SERIAL" shell input tap "$cx" "$cy"
-    return 0
+    return $?
 }
 
 # Tap an element by exact text
@@ -588,6 +606,10 @@ set_api_key() {
     local api_key="$1"
 
     log_info "Setting API key..."
+    # Suppress tracing to avoid exposing API key in debug output
+    local old_trace
+    old_trace=$(set +o | grep xtrace | grep -o '[0-9]')
+    set +x
     sleep 0.5
 
     # Try to find the API key field, scroll if needed
@@ -601,10 +623,13 @@ set_api_key() {
         hs_scroll_down
         sleep 1
     done
+    # Restore tracing
+    if [[ "$old_trace" == "1" ]]; then
+        set -x
+    fi
     if [[ "$found" != "true" ]]; then
         die "Could not locate API key field after scrolling"
     fi
-
     log_ok "API key set"
 }
 
@@ -676,7 +701,7 @@ wait_for_transcription() {
         # Check for success in logcat
         local result
         result=$(adb_cmd logcat -d -s "whisper-input:V" 2>/dev/null | grep -oP "Transcription result: '\K[^']*" | tail -1) || true
-        if [[ -n "$result" && "$result" != "null" ]]; then
+        if [[ -n "$result" && "$result" != "null" && "${result,,}" == *"$expected_lower"* ]]; then
             log_ok "Transcription committed: $result"
             echo -e "${BLUE}[TIME]${NC} Transcription wait: $(( $(date +%s) - start ))s"
             return 0
@@ -684,7 +709,7 @@ wait_for_transcription() {
 
         # Also check UI for text (fallback)
         local text
-        text=$(hs find 'EditText' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1) || true
+        text=$(hs find 'EditText[id=com.example.whispertoinput:id/field_debug_output]' --json 2>/dev/null | grep -oP '"text":\s*"\K[^"]*' | head -1) || true
         if [[ -n "$text" && "$text" != *"Transcribed text will appear here"* ]]; then
             local text_lower="${text,,}"
             if [[ "$text_lower" == *"$expected_lower"* ]]; then

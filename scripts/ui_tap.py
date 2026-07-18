@@ -20,8 +20,9 @@ def dump():
     result = run(f"{ADB} {DEV} exec-out uiautomator dump /dev/tty")
     xml = result.stdout
     # Strip trailing "UI hierchary dumped to: /dev/tty" message
-    if 'UI hierchary' in xml:
-        xml = xml[:xml.index('UI hierchary')]
+    # Strip trailing "UI hierchary dumped to:" message
+    if 'UI hierchary dumped to:' in xml:
+        xml = xml.rsplit('UI hierchary dumped to:', 1)[0]
     # Also strip any trailing whitespace/newlines
     xml = xml.rstrip()
     return xml
