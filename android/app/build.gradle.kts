@@ -3,18 +3,34 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Git-based versioning: main gets exact tag, dev branches get -SNAPSHOT
+val gitVersionName: String = run {
+    val tag = providers.exec {
+        commandLine("git", "describe", "--tags", "--abbrev=0")
+    }.standardOutput.asText.get().trim()
+    val branch = providers.exec {
+        commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
+    }.standardOutput.asText.get().trim()
+    if (branch == "main") tag else "$tag-SNAPSHOT"
+}
+
+val gitVersionCode: Int = run {
+    // Use commit count as versionCode (monotonically increasing)
+    providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+    }.standardOutput.asText.get().trim().toInt()
+}
+
 android {
     namespace = "com.example.whispertoinput"
     compileSdk = 34
-
-
 
     defaultConfig {
         applicationId = "com.example.whispertoinput"
         minSdk = 24
         targetSdk = 34
-        versionCode = 8
-        versionName = "0.6.2"
+        versionCode = gitVersionCode
+        versionName = gitVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -2,10 +2,7 @@
   "plugins": [
     "git-tag",
     ["upload-assets", { "assets": ["android/app/build/outputs/apk/release/app-release.apk"] }],
-    "released",
-    ["exec", {
-      "version": "./scripts/update-version.sh $ARG_0"
-    }]
+    "released"
   ],
   "labels": [
     { "releaseType": "major", "name": "major" },
