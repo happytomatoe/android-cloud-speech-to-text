@@ -39,7 +39,7 @@ release branch="":
     echo "==> Triggering Release workflow on branch '$BRANCH'"
     OUT=$(gh workflow run release.yml --ref "$BRANCH" 2>&1)
     echo "$OUT"
-    RUN_ID=$(echo "$OUT" | grep -oE '(actions/runs/|run )[0-9]+' | grep -oE '[0-9]+' | head -1)
+    RUN_ID=$(echo "$OUT" | grep -oE 'run [0-9]+' | grep -oE '[0-9]+' | head -1)
     if [ -z "$RUN_ID" ]; then
         echo "❌ Could not parse workflow run id from gh output" >&2
         exit 1
