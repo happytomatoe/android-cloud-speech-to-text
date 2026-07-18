@@ -3,6 +3,12 @@
 
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
 
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
+
   "postCreateCommand": "bash .devcontainer/setup.sh",
 
   "customizations": {
