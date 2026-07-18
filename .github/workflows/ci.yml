@@ -55,6 +55,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y espeak-ng ffmpeg
 
+      # Gradle config-time `git describe`/`git rev-parse` at build.gradle.kts:7-15
+      # exits 128 ("dubious ownership") on GitHub Actions. Mark the workspace as
+      # a safe git directory so the Gradle daemon can read it.
+      - name: Configure git safe.directory
+        run: git config --global --add safe.directory '*'
+
       - name: Run all tests (unit + E2E)
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -65,6 +71,7 @@ jobs:
           emulator-options: '-no-window -gpu swiftshader_indirect -noaudio -no-snapshot-save'
           disable-animations: true
           script: |
+            git config --global --add safe.directory '*'
             just test-all
         env:
           DEEPGRAM_KEY: ${{ secrets.DEEPGRAM_KEY }}
