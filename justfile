@@ -1,8 +1,10 @@
 # Whisper To Input - Development Commands
 
-# Paths
-adb := "/var/home/l/Android/Sdk/platform-tools/adb"
-emulator_bin := "/var/home/l/Android/Sdk/emulator/emulator"
+# Android SDK location — honors $ANDROID_PATH (set in ~/.config/fish/config.fish),
+# defaults to the developer-machine path when the var is unset (Codespaces overrides it).
+android_sdk := env_var_or_default("ANDROID_PATH", "/var/home/l/Android/Sdk")
+adb := android_sdk + "/platform-tools/adb"
+emulator_bin := android_sdk + "/emulator/emulator"
 avd := "Pixel_8"
 
 # ── Build ──────────────────────────────────────────────────────────

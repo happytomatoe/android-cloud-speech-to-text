@@ -1,0 +1,44 @@
+{
+  "name": "Whisper To Input (Android)",
+
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17.0",
+      "jdkDistro": "tem",
+      "installMaven": false,
+      "installGradle": false
+    },
+    "ghcr.io/devcontainers/features/android:2": {
+      "installEmulator": true,
+      "emulatorApiLevel": 35,
+      "emulatorArch": "x86_64",
+      "installPlatformTools": true,
+      "platformApiLevel": 34,
+      "installBuildTools": true,
+      "buildToolsApiLevel": 34
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "fwcd.kotlin",
+        "editorconfig.editorconfig",
+        "github.vscode-pull-request-github"
+      ]
+    }
+  }
+
+  // NOTE — emulator / E2E:
+  //   The default 2-vCPU Codespace has no hardware KVM, so the Android emulator
+  //   (and `just test-e2e*`) will NOT run there. For E2E you need a 4+ vCPU
+  //   machine type (paid). Build + `just test` (Robolectric/JVM) work everywhere.
+  //   To require such a machine, add:  "hostRequirements": { "cpus": 4 }
+  //
+  // NOTE — DEEPGRAM_KEY (needed only for E2E):
+  //   Add it as a Codespace secret (repo or user settings) and forward it to the
+  //   codespace. Devcontainer.json has no secrets field; configure it in the
+  //   Codespaces UI (Settings > Codespaces > Secrets).
+}
