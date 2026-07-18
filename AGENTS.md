@@ -182,4 +182,4 @@ Run commands in the **foreground** by default. Do not spawn background processes
 # Notes for agents
 
 - `sleep-i-am-sure` is a real project binary (in `~/.local/bin`, on PATH). It is **intentional**, not a typo for `sleep` — use it wherever a delay is needed (the no-bare-`sleep` extension blocks plain `sleep`).
-- Pre-push hooks must be explicitly installed: `pre-commit install --hook-type pre-push` (the default `just setup-hooks` only installs pre-commit and commit-msg).
+- Pre-push hooks run all tests (`just test-all`) before allowing a push. Use `just setup-hooks` to install all hooks (pre-commit, commit-msg, and pre-push).

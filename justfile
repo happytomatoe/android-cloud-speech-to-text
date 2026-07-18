@@ -252,8 +252,8 @@ setup version="":
 #
 # Note: This removes any lefthook-generated hooks and installs
 # pre-commit (https://pre-commit.com) with the project's
-# .pre-commit-config.yaml. Also adds a custom commit-msg hook
-# that rejects 'Co-Authored-By' lines.
+# .pre-commit-config.yaml. Installs pre-commit, commit-msg (rejects
+# Co-Authored-By lines), and pre-push (runs all tests) hooks.
 setup-hooks:
     #!/usr/bin/env bash
     set -e
@@ -264,7 +264,8 @@ setup-hooks:
     echo "Installing pre-commit hooks..."
     pre-commit install
     pre-commit install --hook-type commit-msg
-    echo "✅ Git hooks installed (commit-msg checks for Co-Authored-By via pre-commit)"
+    pre-commit install --hook-type pre-push
+    echo "✅ Git hooks installed (pre-commit, commit-msg, and pre-push)"
 
 # ── Run all tests in parallel ─────────────────────────────────────
 # Phase 1: Build main APK + compile test classes (single Gradle invocation)
