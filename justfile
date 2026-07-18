@@ -192,6 +192,7 @@ test-e2e-transcribe:
     # sdkman exists only on developer machines; CI uses actions/setup-java.
     [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
     command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
+    export ANDROID_SDK_ROOT="{{android_sdk}}"
     ./run_e2e_test.sh --backend deepgram --expected "hello world"
 
 test:

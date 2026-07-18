@@ -1,0 +1,85 @@
+{
+  "goal_id": "mrqf5u7r-ugaxdb",
+  "objective": "push and wait for aother review round",
+  "push_evidence": {
+    "commit_hash": "7d3bc87bd9054dd5037ddd14a269957d7e2bc446",
+    "commit_message": "fix: apply PR #8 review auto-fixes (21 issues)",
+    "branch": "feat/api-key-links",
+    "push_timestamp_utc": "2026-07-18T13:44:51Z",
+    "files_changed": 8,
+    "insertions": 71,
+    "deletions": 30
+  },
+  "review_trigger_evidence": {
+    "command": "gh pr comment 8 --body '@coderabbitai review'",
+    "timestamp_utc": "2026-07-18T13:45:43Z",
+    "comment_id": "IC_kwDOTbT6Kc8AAAABKrU2eQ",
+    "acknowledgment_timestamp_utc": "2026-07-18T13:45:53Z",
+    "acknowledgment_comment_id": "IC_kwDOTbT6Kc8AAAABKrU4bg",
+    "acknowledgment_message": "Review triggered. Note: CodeRabbit is an incremental review system and does not re-review already reviewed commits. This command is applicable only when automatic reviews are paused."
+  },
+  "review_completion_evidence": {
+    "review_author": "coderabbitai",
+    "review_state": "COMMENTED",
+    "submitted_at_utc": "2026-07-18T13:53:15Z",
+    "run_id": "e08ed574-779e-4429-9e80-c5ccd748e427",
+    "run_configuration": "Organization UI",
+    "review_profile": "CHILL",
+    "plan": "Pro Plus",
+    "files_reviewed": 14,
+    "files_skipped": 6,
+    "files_no_changes": 1,
+    "total_issues": 6,
+    "issues": [
+      {
+        "file": "android/app/build.gradle.kts",
+        "lines": "34-35",
+        "severity": "P2/Major",
+        "category": "Functional Correctness",
+        "title": "Use the computed Git versions in defaultConfig"
+      },
+      {
+        "file": ".github/workflows/release.yml",
+        "lines": "93-99",
+        "severity": "P1/Critical",
+        "category": "Functional Correctness",
+        "title": "Commit the bumped versions to the repository"
+      },
+      {
+        "file": "android/app/src/main/java/com/example/whispertoinput/WhisperInputService.kt",
+        "lines": "138-142",
+        "severity": "P2/Major",
+        "category": "Potential Issue",
+        "title": "Auto-start still bypasses debug test-file mode"
+      },
+      {
+        "file": ".github/workflows/release.yml",
+        "lines": "105-117",
+        "severity": "P3/Trivial",
+        "category": "Maintainability",
+        "title": "Align tag creation with repository scripts"
+      },
+      {
+        "file": ".github/workflows/release.yml",
+        "lines": "53-91",
+        "severity": "P3/Trivial",
+        "category": "Maintainability",
+        "title": "Safely strip suffixes before parsing version"
+      }
+    ]
+  },
+  "goal_timeline": {
+    "goal_created_at": "2026-07-18T13:45:20Z",
+    "push_completed_at": "2026-07-18T13:44:51Z",
+    "review_triggered_at": "2026-07-18T13:45:53Z",
+    "review_completed_at": "2026-07-18T13:53:15Z",
+    "total_duration_seconds": 494
+  },
+  "verification_method": "gh_api_query",
+  "verification_commands": [
+    "gh pr view 8 --json reviews --jq '[.reviews[] | select(.author.login == \"coderabbitai\")] | sort_by(.submittedAt) | reverse | .[0]'",
+    "gh pr view 8 --json comments --jq '[.comments[] | select(.user == null and .createdAt > \"2026-07-18T13:45:53Z\")]'",
+    "git log --oneline -1",
+    "git show HEAD --stat"
+  ]
+}

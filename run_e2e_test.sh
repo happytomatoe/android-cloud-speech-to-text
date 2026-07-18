@@ -778,6 +778,9 @@ run_e2e_test() {
     STEP_START=$SECONDS
     log_info "=== Starting E2E test for $backend ==="
 
+    # Set up virtual mic before any emulator operations
+    setup_virtual_mic
+
     # 1. Emulator
     start_emulator
     step_timer "Emulator start"
