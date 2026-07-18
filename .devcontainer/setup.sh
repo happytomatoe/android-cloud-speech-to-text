@@ -8,6 +8,11 @@ export ANDROID_SDK_ROOT="$SDK_ROOT"
 export ANDROID_HOME="$SDK_ROOT"
 export ANDROID_PATH="$SDK_ROOT"
 
+# The postCreateCommand runs as the non-root `vscode` user, which has
+# passwordless sudo. /opt and /etc need root, so create + chown the SDK dir.
+sudo mkdir -p "$SDK_ROOT"
+sudo chown "$(whoami):$(id -gn)" "$SDK_ROOT"
+
 # ── System packages: JDK 17 + audio tooling ───────────────────────
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
@@ -34,7 +39,7 @@ sdkmanager \
   "system-images;android-35;default;x86_64"
 
 # ── Persist the environment for every future shell ────────────────
-cat > /etc/profile.d/android-sdk.sh <<EOF
+sudo tee /etc/profile.d/android-sdk.sh >/dev/null <<EOF
 export ANDROID_SDK_ROOT=$SDK_ROOT
 export ANDROID_HOME=$SDK_ROOT
 export ANDROID_PATH=$SDK_ROOT
@@ -81,8 +86,14 @@ just setup-hooks || echo "⚠️  just setup-hooks failed — run it manually if
 
 echo "✅ Codespace dev environment ready (ANDROID_PATH=$SDK_ROOT)"
 
-# Install pi coding agent globally
+# Ensure Node.js + npm exist (required for the pi install below). The default
+# Codespaces universal image ships them, but guard so a different base still works.
+if ! command -v npm >/dev/null 2>&1; then
+  sudo apt-get install -y --no-install-recommends nodejs npm
+fi
+
+# Install pi coding agent globally (needs root for the system-wide npm prefix)
 echo "📦 Installing pi coding agent..."
-npm install -g @earendil-works/pi-coding-agent
+sudo npm install -g @earendil-works/pi-coding-agent
 echo "✅ pi coding agent installed"
 

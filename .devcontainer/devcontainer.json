@@ -1,14 +1,6 @@
 {
   "name": "Whisper To Input (Android)",
 
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-
-  "features": {
-    "ghcr.io/devcontainers/features/sshd:1": {
-      "version": "latest"
-    }
-  },
-
   "postCreateCommand": "bash .devcontainer/setup.sh",
 
   "customizations": {
@@ -33,9 +25,10 @@
   //   codespace. Devcontainer.json has no secrets field; configure it in the
   //   Codespaces UI (Settings > Codespaces > Secrets).
   //
-  // NOTE — self-contained by design:
-  //   Earlier attempts failed because the build token could not pull the
-  //   devcontainers Android feature from ghcr.io (missing read:packages). This
-  //   config installs the JDK + Android SDK directly in setup.sh, so it has no
-  //   dependency on ghcr.io.
+  // NOTE — no custom `image` / `sshd` feature on purpose:
+  //   GitHub Codespaces provides native SSH tunneling only on the default
+  //   universal image. Pinning a custom `image` (or adding the `sshd`
+  //   devcontainer feature) breaks `gh codespace ssh` (Permission denied).
+  //   All tooling (JDK, Android SDK, pi, …) is installed by setup.sh, so we
+  //   deliberately use the default image and keep this file minimal.
 }
