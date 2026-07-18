@@ -20,6 +20,34 @@ build variant="release":
     cd android && ./gradlew assemble${VARIANT^}
     echo "✅ Build successful (${VARIANT})"
 
+# ── Release ──────────────────────────────────────────────────────────
+
+# Trigger the GitHub "Release" workflow for a branch and wait for it to finish.
+#   just release                 # run against the current branch
+#   just release branch=main     # run against a specific branch
+# Requires `gh` to be authenticated (needs `repo` + `workflow` scopes) and the
+# workflow to allow manual dispatch (see .github/workflows/release.yml).
+# NOTE: `auto shipit` on a non-base branch produces a CANARY prerelease.
+# For a full release, merge to main first (or run `just release branch=main`).
+release branch="":
+    #!/usr/bin/env bash
+    set -e
+    BRANCH="{{branch}}"
+    if [ -z "$BRANCH" ]; then
+        BRANCH=$(git branch --show-current)
+    fi
+    echo "==> Triggering Release workflow on branch '$BRANCH'"
+    OUT=$(gh workflow run release.yml --ref "$BRANCH" 2>&1)
+    echo "$OUT"
+    RUN_ID=$(echo "$OUT" | grep -oE 'run [0-9]+' | grep -oE '[0-9]+' | head -1)
+    if [ -z "$RUN_ID" ]; then
+        echo "❌ Could not parse workflow run id from gh output" >&2
+        exit 1
+    fi
+    echo "==> Workflow run #$RUN_ID started — waiting for completion..."
+    gh run watch "$RUN_ID" --exit-status
+    echo "==> ✅ Release workflow completed"
+
 # ── Emulator Lifecycle ─────────────────────────────────────────────
 
 pid_file := ".emulator.pid"

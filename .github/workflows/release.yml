@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to run the release against (used by 'just release' via --ref)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
