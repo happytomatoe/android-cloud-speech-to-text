@@ -110,10 +110,15 @@ jobs:
           VERSION="${{ steps.new.outputs.version }}"
           APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
 
+          # Fail if release already exists — don't silently retarget
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "❌ Tag v$VERSION already exists. Duplicate releases are not allowed."
+            exit 1
+          fi
+
           # Create tag
-          git tag -f "v$VERSION"
-          git push -f origin :refs/tags/v$VERSION 2>/dev/null || true
-          git push -f origin "v$VERSION"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
 
           # Create release with APK
           gh release create "v$VERSION" \
