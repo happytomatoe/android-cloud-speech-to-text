@@ -102,6 +102,5 @@ jobs:
           if [ "${{ steps.version.outputs.branch }}" = "main" ]; then
             auto shipit
           else
-            # Canary/snapshot from a branch: prerelease only, no commit/tag push of a version.
-            auto shipit --prerelease
+            auto shipit --use-version "${{ steps.version.outputs.version }}" --prerelease --base-branch "${{ github.ref_name }}"
           fi
