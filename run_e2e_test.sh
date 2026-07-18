@@ -126,7 +126,13 @@ wait_for() {
     return 1
 }
 
-die() { log_err "$*"; exit 1; }
+die() {
+    log_err "$*"
+    # Best-effort diagnostic screenshot so CI failures are never blind
+    # (e.g. a missing UI node we can then inspect in the uploaded artifact).
+    capture_diag 2>/dev/null || true
+    exit 1
+}
 
 run_cmd() {
     local cmd="$1"
@@ -178,9 +184,12 @@ setup_virtual_mic() {
 capture_diag() {
     local out="${1:-e2e_diag.png}"
     log_warn "Capturing diagnostic screenshot -> $out"
-    "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
+    # Prefer hs see (agent-sized JPEG); fall back to adb screencap if the
+    # daemon isn't reachable (e.g. emulator unreachable at failure time).
+    hs --device "$SERIAL" see --size 768 "$out" 2>/dev/null \
+        || "$ADB" -s "$SERIAL" exec-out screencap -p "$out" 2>/dev/null \
         || "$ADB" -s "$SERIAL" shell screencap -p > "$out" 2>/dev/null \
-        || log_warn "screencap failed (emulator may not be reachable)"
+        || log_warn "screenshot failed (emulator may not be reachable)"
 }
 
 cleanup_virtual_mic() {
@@ -411,11 +420,6 @@ hs_tap_text() {
     echo "$result" | grep -q '"ok":true'
 }
 
-# Wait for text to appear (returns 0 on found)
-hs_wait_text() {
-    $HS wait "$1" --timeout 5000 2>/dev/null
-}
-
 # Set text into a field by resource-id (no IME switching needed)
 hs_fill_rid() {
     local field_id="$1"
@@ -446,8 +450,9 @@ hs_daemon_start() {
 open_settings() {
     log_info "Opening Settings activity..."
     adb_cmd shell am start -n "$PACKAGE/.MainActivity" >/dev/null
-    # Wait for Settings activity to be ready instead of fixed sleep
-    wait_for "Settings activity ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
+    # Wait for the Settings activity to reach the foreground (no raw dumpsys poll)
+    $HS wait "$PACKAGE/.MainActivity" --timeout 5s >/dev/null 2>&1 \
+        || wait_for "Settings activity ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
 }
 
 select_backend() {
@@ -456,23 +461,20 @@ select_backend() {
 
     log_info "Selecting backend: $display"
 
-    # Tap the spinner by resource-id, with retries.
-    local tap_ok=false
-    for attempt in 1 2 3 4 5; do
-        if hs_tap_rid "spinner_speech_to_text_backend"; then
-            tap_ok=true
-            break
-        fi
-        log_warn "Spinner not found (attempt $attempt/5), retrying..."
-        sleep 2
-    done
-    if [[ "$tap_ok" != "true" ]]; then
-        die "Could not find spinner after 5 attempts"
+    # Tap the spinner; daemon retries on TIMEOUT/NOT_FOUND over the warm socket.
+    # (Use `hs tap` here — the `#rid` shorthand is a `tap`-only convenience;
+    # `hs act --tap` does not resolve it and would report NOT_FOUND.)
+    if ! $HS tap "#spinner_speech_to_text_backend" --retries 4 --retry-delay 2s --timeout 5s >/dev/null 2>&1; then
+        die "Could not find spinner after retries"
     fi
     sleep-i-am-sure 0.5
 
-    # Now select the backend from the dropdown by text
-    hs_tap_text "$display"
+    # Select the backend from the dropdown: tap-then-verify the endpoint field
+    # reflects the new backend (fallback to a plain text tap if act is unhappy).
+    $HS act --tap "$display" \
+        --until 'EditText[id=com.example.whispertoinput:id/field_endpoint]' \
+        --retries 2 --retry-delay 1s --timeout 5s >/dev/null 2>&1 \
+        || hs_tap_text "$display"
     sleep-i-am-sure 0.5
 
     # Verify endpoint updated (single dump, parse both fields)
@@ -540,7 +542,8 @@ focus_text_field() {
 
     # Open the app's MainActivity (has field_debug_output EditText)
     adb_cmd shell am start -n "$PACKAGE/.MainActivity" >/dev/null
-    wait_for "App ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
+    $HS wait "$PACKAGE/.MainActivity" --timeout 5s >/dev/null 2>&1 \
+        || wait_for "App ready" 5 'adb_cmd shell dumpsys activity activities | grep -q "topResumedActivity"'
 
     # Tap the debug output EditText to focus it and show keyboard
     local attempts=0
