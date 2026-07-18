@@ -424,6 +424,32 @@ hs_tap_rid() {
     echo "$result" | grep -q '"ok":true'
 }
 
+# Tap a view by resource-id via uiautomator dump + input tap. More robust
+# than `hs tap #id` for views (e.g. Spinners) that hs's tappable-node index
+# intermittently fails to surface, causing flaky NOT_FOUND.
+tap_rid_via_ui() {
+    local rid="$1"
+    local xml
+    xml=$(mktemp /tmp/ui_XXXX.xml)
+    "$ADB" -s "$SERIAL" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 \
+        && "$ADB" -s "$SERIAL" pull /sdcard/ui.xml "$xml" >/dev/null 2>&1 \
+        || { rm -f "$xml"; return 1; }
+    local node bounds
+    node=$(grep "id/$rid" "$xml" | head -1)
+    bounds=$(echo "$node" | grep -oP 'bounds="\K\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]')
+    rm -f "$xml"
+    [[ -z "$bounds" ]] && return 1
+    local x1 y1 x2 y2 cx cy
+    x1=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\1/')
+    y1=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\2/')
+    x2=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\3/')
+    y2=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\4/')
+    cx=$(( (x1 + x2) / 2 ))
+    cy=$(( (y1 + y2) / 2 ))
+    "$ADB" -s "$SERIAL" shell input tap "$cx" "$cy"
+    return 0
+}
+
 # Tap an element by exact text
 hs_tap_text() {
     local result
@@ -487,8 +513,19 @@ select_backend() {
     done
     [[ -z "$ep" ]] && log_warn "Endpoint field never populated — UI may not have initialized"
 
-    # Tap the spinner; daemon retries on TIMEOUT/NOT_FOUND over the warm socket.
-    if ! $HS tap "#spinner_speech_to_text_backend" --retries 4 --retry-delay 2s --timeout 5s >/dev/null 2>&1; then
+    # Open the backend spinner. Use uiautomator dump + input tap rather than
+    # `hs tap #id`: hs's tappable-node index intermittently fails to surface
+    # the Spinner, causing flaky NOT_FOUND.
+    local tap_ok=false
+    for attempt in 1 2 3 4 5; do
+        if tap_rid_via_ui "spinner_speech_to_text_backend"; then
+            tap_ok=true
+            break
+        fi
+        log_warn "Spinner tap failed (attempt $attempt/5), retrying..."
+        ssleep 1
+    done
+    if [[ "$tap_ok" != "true" ]]; then
         die "Could not find spinner after retries"
     fi
     ssleep 0.5
