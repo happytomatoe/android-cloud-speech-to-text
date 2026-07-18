@@ -108,6 +108,10 @@ step_timer() {
 # =============================================================================
 
 log_info() { echo -e "${BLUE}[$(date +%H:%M:%S)] [INFO]${NC} $*"; }
+
+# Portable sleep: CI runners have plain `sleep`; some dev shells shadow it
+# with a `sleep-i-am-sure` guard. Fall back so the same script runs in both.
+ssleep() { command sleep "$@" 2>/dev/null || sleep-i-am-sure "$@" 2>/dev/null || true; }
 log_ok()   { echo -e "${GREEN}[$(date +%H:%M:%S)] [OK]${NC} $*"; }
 log_warn() { echo -e "${YELLOW}[$(date +%H:%M:%S)] [WARN]${NC} $*"; }
 log_err()  { echo -e "${RED}[$(date +%H:%M:%S)] [ERR]${NC} $*"; }
@@ -390,7 +394,7 @@ enable_ime() {
         fi
         attempts=$((attempts + 1))
         log_warn "IME not yet registered, retrying ($attempts/3)..."
-        sleep-i-am-sure 1
+        ssleep 1
     done
     die "Failed to enable IME after 3 attempts"
 }
@@ -475,7 +479,7 @@ select_backend() {
     if ! $HS tap "#spinner_speech_to_text_backend" --retries 4 --retry-delay 2s --timeout 5s >/dev/null 2>&1; then
         die "Could not find spinner after retries"
     fi
-    sleep-i-am-sure 0.5
+    ssleep 0.5
 
     # Select the backend from the dropdown: tap-then-verify the endpoint field
     # reflects the new backend (fallback to a plain text tap if act is unhappy).
@@ -483,7 +487,7 @@ select_backend() {
         --until 'EditText[id=com.example.whispertoinput:id/field_endpoint]' \
         --retries 2 --retry-delay 1s --timeout 5s >/dev/null 2>&1 \
         || hs_tap_text "$display"
-    sleep-i-am-sure 0.5
+    ssleep 0.5
 
     # Verify endpoint updated (single dump, parse both fields)
     local expected="${BACKEND_ENDPOINT[$backend]}"
