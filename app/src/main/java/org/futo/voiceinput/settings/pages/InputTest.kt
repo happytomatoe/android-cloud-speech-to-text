@@ -27,7 +27,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import org.futo.voiceinput.BuildConfig
 import org.futo.voiceinput.R
+import org.futo.voiceinput.VoiceInputMethodService
 import org.futo.voiceinput.settings.FORCE_SHOW_NOTICE
 import org.futo.voiceinput.settings.NavigationItem
 import org.futo.voiceinput.settings.NavigationItemStyle
@@ -63,6 +65,17 @@ fun TestScreen(
         }
     }
 
+    // Debug output field for E2E testing (debug builds only)
+    val debugTranscriptionResult = remember { mutableStateOf<String?>(null) }
+    val debugTranscriptionError = remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(Unit) {
+        if (BuildConfig.DEBUG) {
+            debugTranscriptionResult.value = VoiceInputMethodService.lastTranscriptionResult
+            debugTranscriptionError.value = VoiceInputMethodService.lastTranscriptionError
+        }
+    }
+
     ScrollableList {
         ScreenTitle(title = stringResource(R.string.input_testing), showBack = true, navController = navController)
         TextField(
@@ -90,6 +103,31 @@ fun TestScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        // Debug output for E2E testing (debug builds only)
+        if (BuildConfig.DEBUG) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "Debug Output (E2E Testing)",
+                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(16.dp, 8.dp)
+            )
+            TextField(
+                value = debugTranscriptionResult.value ?: "Transcription results will appear here",
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            )
+            if (debugTranscriptionError.value != null) {
+                Text(
+                    "Error: ${debugTranscriptionError.value}",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))

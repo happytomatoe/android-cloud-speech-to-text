@@ -1,6 +1,9 @@
 package org.futo.voiceinput
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.os.Build
@@ -61,12 +64,29 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.futo.voiceinput.migration.scheduleModelMigrationJob
+import org.futo.voiceinput.settings.API_KEY
+import org.futo.voiceinput.settings.ENDPOINT
+import org.futo.voiceinput.settings.MODEL
+import org.futo.voiceinput.settings.TEST_FILE_PATH
+import org.futo.voiceinput.settings.USE_TEST_FILE
+import org.futo.voiceinput.settings.dataStore
+import org.futo.voiceinput.settings.setSetting
 import org.futo.voiceinput.settings.pages.ConditionalUnpaidNoticeInVoiceInputWindow
 import org.futo.voiceinput.theme.UixThemeAuto
 import org.futo.voiceinput.updates.scheduleUpdateCheckingJob
 
+private const val AUDIO_MEDIA_TYPE_WAV = "audio/wav"
+
 val SupportsNavbarExtension = Build.VERSION.SDK_INT >= 28
+
+const val ACTION_TOGGLE_RECORDING = "org.futo.voiceinput.action.TOGGLE_RECORDING"
+const val ACTION_CONFIGURE_CLOUD = "org.futo.voiceinput.action.CONFIGURE_CLOUD"
 
 @Composable
 fun navBarHeight(): Dp = with(LocalDensity.current) {
@@ -187,6 +207,15 @@ class VoiceInputMethodService : InputMethodService(), LifecycleOwner, ViewModelS
 
     private val inputMethodManager: InputMethodManager
         get() = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+
+    companion object {
+        var lastTranscriptionResult: String? = null
+        var lastTranscriptionError: String? = null
+    }
+
+    // E2E broadcast receivers (CONFIGURE_CLOUD / TOGGLE_RECORDING) are registered in
+    // SettingsActivity so they are alive whenever the app is in the foreground,
+    // independent of whether the IME service is bound to a text field.
 
     override fun onCreate() {
         super.onCreate()
@@ -387,5 +416,37 @@ class VoiceInputMethodService : InputMethodService(), LifecycleOwner, ViewModelS
 
         println("Destroy")
         handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+    }
+}
+
+// ── E2E test-file transcription (triggered by the TOGGLE_RECORDING broadcast) ──
+// Defined at file scope so it can be invoked from SettingsActivity's receiver
+// without requiring the IME service to be bound to a text field.
+fun startTestFileTranscription(context: Context) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val testFilePath = context.dataStore.data
+            .map { it[TEST_FILE_PATH.key] ?: "/data/user/0/${context.packageName}/cache/test_audio.wav" }
+            .first()
+        val testFile = java.io.File(testFilePath)
+        if (!testFile.exists()) {
+            android.util.Log.e("voice-input", "Test file not found: $testFilePath")
+            VoiceInputMethodService.lastTranscriptionError = "Test file not found: $testFilePath"
+            return@launch
+        }
+        android.util.Log.d("voice-input", "Starting test file transcription: $testFilePath")
+        CloudTranscriber().startAsync(
+            context = context,
+            filename = testFilePath,
+            mediaType = AUDIO_MEDIA_TYPE_WAV,
+            callback = { result ->
+                VoiceInputMethodService.lastTranscriptionResult = result
+                VoiceInputMethodService.lastTranscriptionError = null
+                android.util.Log.d("voice-input", "Transcription result: $result")
+            },
+            exceptionCallback = { error ->
+                VoiceInputMethodService.lastTranscriptionError = error
+                android.util.Log.e("voice-input", "Transcription error: $error")
+            }
+        )
     }
 }

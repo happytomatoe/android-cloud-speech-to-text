@@ -150,3 +150,12 @@ val THEME_KEY = SettingsKey(
 val BEAM_SEARCH = SettingsKey(key = booleanPreferencesKey("use_beam_search"), default = true)
 val MODELS_MIGRATED = SettingsKey(key = booleanPreferencesKey("models_migrated_1"), default = false)
 val DISMISS_MIGRATION_TIP = SettingsKey(key = booleanPreferencesKey("dismiss_migration_tip"), default = false)
+
+// Test-file mode for E2E testing (debug builds only)
+val USE_TEST_FILE = SettingsKey(key = booleanPreferencesKey("use_test_file"), default = false)
+val TEST_FILE_PATH = SettingsKey(key = stringPreferencesKey("test_file_path"), default = "")
+
+// Cloud backend settings
+val ENDPOINT = SettingsKey(key = stringPreferencesKey("endpoint"), default = "https://api.deepgram.com/v1/listen")
+val API_KEY = SettingsKey(key = stringPreferencesKey("api_key"), default = "")
+val MODEL = SettingsKey(key = stringPreferencesKey("model"), default = "nova-3")

@@ -25,9 +25,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
@@ -331,5 +337,39 @@ fun NavigationItem(title: String, style: NavigationItemStyle, navigate: () -> Un
             NavigationItemStyle.Misc -> Icon(Icons.Default.ArrowForward, contentDescription = null)
             else -> {}
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingTextDataStore(
+    title: String,
+    setting: SettingsKey<String>,
+    placeholder: String = "",
+    disabled: Boolean = false,
+    icon: (@Composable () -> Unit)? = null,
+) {
+    val (value, setValue) = useDataStore(key = setting.key, default = setting.default)
+    var text by remember { mutableStateOf(value) }
+
+    SettingItem(
+        title = title,
+        onClick = { },
+        icon = icon,
+        disabled = disabled,
+    ) {
+        TextField(
+            value = text,
+            onValueChange = { newText ->
+                text = newText
+                setValue(newText)
+            },
+            placeholder = { Text(placeholder) },
+            modifier = Modifier
+                .width(200.dp)
+                .defaultMinSize(0.dp, 48.dp),
+            singleLine = true,
+            enabled = !disabled
+        )
     }
 }
