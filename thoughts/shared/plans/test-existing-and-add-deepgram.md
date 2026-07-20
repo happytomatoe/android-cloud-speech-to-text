@@ -70,8 +70,8 @@ Copy AGENTS.md and .agents folder from the reference project to enable agent-ass
 2. Copy `../whisper-to-input/.agents/skills/` → `./.agents/skills/`
 
 ### Verification
-- [ ] `./AGENTS.md` exists
-- [ ] `./.agents/skills/` directory exists with all skill folders
+- [x] `./AGENTS.md` exists
+- [x] `./.agents/skills/` directory exists with all skill folders
 
 ## Phase 3: Add Test-File Mode (Local Whisper Backend)
 
@@ -99,10 +99,10 @@ Add test-file mode to the voice-input app, enabling E2E testing without micropho
 **Changes**: Read test WAV from `context.cacheDir/test_audio.wav`
 
 ### Verification
-- [ ] App compiles: `./gradlew assembleDebug`
-- [ ] Test WAV file can be pushed to emulator cache
-- [ ] Tapping mic in test mode reads from cache (no mic needed)
-- [ ] Transcription appears in debug output field
+- [x] App compiles: `./gradlew assembleDebug`
+- [x] Test WAV file can be pushed to emulator cache
+- [x] Tapping mic in test mode reads from cache (no mic needed)
+- [x] Transcription appears in debug output field
 ## Phase 4: Add E2E Test Script to whisper-to-input
 
 ### Goal
@@ -119,10 +119,10 @@ Port `run_e2e_test.sh` from whisper-to-input, adapted for voice-input package.
 - Verification: check debug output field for expected text
 
 ### Verification
-- [ ] Script exists at `../whisper-to-input/run_e2e_test_voice_input.sh`
-- [ ] Script is executable
-- [ ] Script can generate test WAV with espeak-ng
-- [ ] Script pushes WAV to emulator and triggers transcription
+- [x] Script exists at `../whisper-to-input/run_e2e_test_voice_input.sh`
+- [x] Script is executable
+- [x] Script can generate test WAV with espeak-ng
+- [x] Script pushes WAV to emulator and triggers transcription
 
 ## Phase 5: Add Deepgram Cloud Backend
 
@@ -170,10 +170,10 @@ testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
 (OkHttp is already included in the app)
 
 ### Verification
-- [ ] App compiles: `./gradlew assembleDebug`
-- [ ] CloudTranscriber sends audio to Deepgram API
-- [ ] Settings page shows Local/Cloud toggle
-- [ ] Test-file mode works with cloud backend
+- [x] App compiles: `./gradlew assembleDebug`
+- [x] CloudTranscriber sends audio to Deepgram API
+- [x] Settings page shows Local/Cloud toggle
+- [x] Test-file mode works with cloud backend
 
 ## Phase 6: Verify E2E with Deepgram
 
@@ -187,25 +187,25 @@ Run the full E2E test with Deepgram backend and verify text matches expected.
 4. Verify: text "hello world" appears in debug output field
 
 ### Verification
-- [ ] E2E test passes with Deepgram backend
-- [ ] Transcription matches expected text
+- [x] E2E test passes with Deepgram backend
+- [x] Transcription matches expected text
 
 ## Success Criteria
 
 ### Automated Verification:
-- [ ] App builds: `./gradlew assembleDebug`
-- [ ] Unit tests pass: `./gradlew testDebugUnitTest`
-- [ ] Test-file mode works with local Whisper
-- [ ] E2E test script exists and is executable
-- [ ] E2E test passes with Deepgram backend
+- [x] App builds: `./gradlew assembleDebug`
+- [x] Unit tests pass: `./gradlew testDebugUnitTest`
+- [x] Test-file mode works with local Whisper
+- [x] E2E test script exists and is executable
+- [x] E2E test passes with Deepgram backend
 
 ### Manual Verification:
-- [ ] App installs and runs on emulator
-- [ ] Voice keyboard appears when text field is focused
-- [ ] Mic button triggers recording
-- [ ] Transcription appears in text field
-- [ ] Test-file mode reads WAV from cache (no mic)
-- [ ] Cloud mode sends audio to Deepgram and returns text
+- [x] App installs and runs on emulator
+- [x] Voice keyboard appears when text field is focused
+- [x] Mic button triggers recording
+- [x] Transcription appears in text field
+- [x] Test-file mode reads WAV from cache (no mic)
+- [x] Cloud mode sends audio to Deepgram and returns text
 
 ## What We're NOT Doing
 - Modifying the Compose settings UI significantly (minimal changes)
