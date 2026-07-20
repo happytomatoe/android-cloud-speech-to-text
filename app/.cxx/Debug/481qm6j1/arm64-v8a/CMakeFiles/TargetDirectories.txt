@@ -1,3 +1,0 @@
-/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/arm64-v8a/CMakeFiles/voiceinput.dir
-/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/arm64-v8a/CMakeFiles/edit_cache.dir
-/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/arm64-v8a/CMakeFiles/rebuild_cache.dir

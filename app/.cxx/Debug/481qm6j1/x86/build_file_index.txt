@@ -1,1 +1,0 @@
-/var/home/l/git/voice-input/app/src/main/cpp/CMakeLists.txt

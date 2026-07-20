@@ -1,9 +1,0 @@
-# ninja log v5
-2	79	1784568267381915192	CMakeFiles/voiceinput.dir/jni_common.cpp.o	2b0b9c99d4328e5e
-1	556	1784568267854917845	CMakeFiles/voiceinput.dir/ggml/ggml-alloc.c.o	fd224571d691337a
-2	619	1784568267915918188	CMakeFiles/voiceinput.dir/ggml/ggml-backend.c.o	33ab2ff95f72c9f3
-1	733	1784568268032918844	CMakeFiles/voiceinput.dir/ggml/ggml-quants.c.o	e23f0380f9328a55
-1	1656	1784568268944923959	CMakeFiles/voiceinput.dir/ggml/ggml.c.o	7d1305a9876f407b
-0	1964	1784568269260925731	CMakeFiles/voiceinput.dir/voiceinput.cpp.o	5749b3f0fd9d5534
-0	17969	1784568285221015245	CMakeFiles/voiceinput.dir/ggml/whisper.cpp.o	9e338ff45fd995d
-17969	18022	1784568285322015812	/var/home/l/git/voice-input/app/build/intermediates/cxx/Debug/481qm6j1/obj/x86_64/libvoiceinput.so	bf42e24ec3c63e8c
