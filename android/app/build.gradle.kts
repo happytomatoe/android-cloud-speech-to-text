@@ -3,11 +3,29 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Git-based versioning: main gets exact tag, dev branches get -SNAPSHOT.
+// Resilient to missing git metadata (shallow clone, dubious ownership) so the
+// build never fails purely because version probing could not run.
+fun gitOutputOr(fallback: String, vararg args: String): String =
+    runCatching {
+        providers.exec { commandLine("git", *args) }
+            .standardOutput.asText.get().trim()
+    }.getOrDefault(fallback)
+
+val gitVersionName: String = run {
+    val tag = gitOutputOr("0.0.0", "describe", "--tags", "--abbrev=0")
+    val branch = gitOutputOr("dev", "rev-parse", "--abbrev-ref", "HEAD")
+    if (branch == "main") tag else "$tag-SNAPSHOT"
+}
+
+val gitVersionCode: Int = run {
+    // Use commit count as versionCode (monotonically increasing)
+    gitOutputOr("1", "rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+}
+
 android {
     namespace = "com.example.whispertoinput"
     compileSdk = 34
-
-
 
     defaultConfig {
         applicationId = "com.example.whispertoinput"

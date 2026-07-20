@@ -1,8 +1,11 @@
 # Whisper To Input - Development Commands
 
-# Paths
-adb := "/var/home/l/Android/Sdk/platform-tools/adb"
-emulator_bin := "/var/home/l/Android/Sdk/emulator/emulator"
+# Android SDK location — honors $ANDROID_PATH (set in ~/.config/fish/config.fish),
+# defaults to the developer-machine path when the var is unset.
+android_sdk := env_var_or_default("ANDROID_PATH", "/var/home/l/Android/Sdk")
+# Quote SDK paths to handle spaces (Just concat — $(...) is shell substitution, not Just interpolation)
+adb := '"' + android_sdk + '/platform-tools/adb"'
+emulator_bin := '"' + android_sdk + '/emulator/emulator"'
 avd := "Pixel_8"
 
 # ── Build ──────────────────────────────────────────────────────────
@@ -18,10 +21,39 @@ build variant="release":
     cd android && ./gradlew assemble${VARIANT^}
     echo "✅ Build successful (${VARIANT})"
 
+# ── Release ──────────────────────────────────────────────────────────
+
+# Trigger the GitHub "Release" workflow for a branch and wait for it to finish.
+#   just release                 # run against the current branch
+#   just release branch=main     # run against a specific branch
+# Requires `gh` to be authenticated (needs `repo` + `workflow` scopes) and the
+# workflow to allow manual dispatch (see .github/workflows/release.yml).
+# NOTE: `auto shipit` on a non-base branch produces a CANARY prerelease.
+# For a full release, merge to main first (or run `just release branch=main`).
+release branch="":
+    #!/usr/bin/env bash
+    set -e
+    BRANCH="{{branch}}"
+    if [ -z "$BRANCH" ]; then
+        BRANCH=$(git branch --show-current)
+    fi
+    echo "==> Triggering Release workflow on branch '$BRANCH'"
+    OUT=$(gh workflow run release.yml --ref "$BRANCH" 2>&1)
+    echo "$OUT"
+    RUN_ID=$(echo "$OUT" | grep -oE '(actions/runs/|run )[0-9]+' | grep -oE '[0-9]+' | head -1)
+    if [ -z "$RUN_ID" ]; then
+        echo "❌ Could not parse workflow run id from gh output" >&2
+        exit 1
+    fi
+    echo "==> Workflow run #$RUN_ID started — waiting for completion..."
+    gh run watch "$RUN_ID" --exit-status
+    echo "==> ✅ Release workflow completed"
+
 # ── Emulator Lifecycle ─────────────────────────────────────────────
 
 pid_file := ".emulator.pid"
 emu_log := "/tmp/emulator.log"
+mode_file := "/tmp/emulator.mode"
 
 # Start the emulator. Base command: emulator -avd Pixel_8
 #   just emulator-start              # headless  -> emulator -avd Pixel_8 -no-window
@@ -47,6 +79,8 @@ emulator-start headful="false":
         MODE="headless"
     fi
     echo "Starting emulator ($MODE): emulator -avd {{avd}} $FLAGS"
+    # Save mode to file for E2E script to detect
+    echo "$MODE" > {{mode_file}}
     # setsid detaches it from this shell so it survives after `just` returns
     setsid {{emulator_bin}} -avd {{avd}} $FLAGS > {{emu_log}} 2>&1 &
     echo $! > {{pid_file}}
@@ -55,6 +89,10 @@ emulator-start headful="false":
     for i in $(seq 1 60); do
         if [ "$({{adb}} shell getprop sys.boot_completed 2>/dev/null)" = "1" ]; then
             echo "✅ Emulator booted (PID $(cat {{pid_file}}) saved to {{pid_file}})"
+            # Disable animations for faster UI automation
+            {{adb}} shell settings put global window_animation_scale 0
+            {{adb}} shell settings put global transition_animation_scale 0
+            {{adb}} shell settings put global animator_duration_scale 0
             exit 0
         fi
         sleep-i-am-sure 2
@@ -84,6 +122,7 @@ emulator-stop:
         fi
         rm -f {{pid_file}}
     fi
+    rm -f {{mode_file}}
     echo "✅ Emulator stopped"
 
 # Cold boot and save snapshot (for quick boot later)
@@ -144,11 +183,23 @@ test-e2e variant="release": (build variant)
 # Runs Tiers 1-3 JVM tests: keyboard state machine, backspace, transcriber, services.
 # `just test` runs them with cross-module parallelism enabled (see gradle.properties:
 # org.gradle.parallel=true).
+# Full transcription E2E: build, install, drive the app via hs, and verify
+# the STT result (test-file mode) against an expectation. Requires a running
+# emulator. API key is retrieved from secret-tool (service voice-to-text).
+test-e2e-transcribe:
+    #!/usr/bin/env bash
+    set -e
+    # sdkman exists only on developer machines; CI uses actions/setup-java.
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+    command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
+    export ANDROID_SDK_ROOT="{{android_sdk}}"
+    ./run_e2e_test.sh --backend deepgram --expected "hello world"
+
 test:
     #!/usr/bin/env bash
     set -e
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk env >/dev/null
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+    command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
     cd android && ./gradlew testDebugUnitTest --parallel
 
 # ── Instrumented Tests (Espresso, on a running emulator) ──────────
@@ -161,7 +212,86 @@ test-instrumented:
     cd android && ./gradlew connectedDebugAndroidTest
 
 # ── Repo Setup ───────────────────────────────────────────────────
-# Point git at the repo's tracked hooks (e.g. commit-msg that forbids
-# Co-Authored-By trailers). Run once after cloning.
+# Setup development tools
+#   just setup              # install latest stable handsets (>14 days old)
+#   just setup v0.1.36     # install specific version
+setup version="":
+    #!/usr/bin/env bash
+    set -e
+
+    REPO="elliotgao2/handsets"
+    BIN_DIR="$HOME/.local/bin"
+    ARCHIVE="handsets-linux-x86_64.tar.gz"
+
+    # Resolve version: pinned or latest stable (>14 days old)
+    if [ -n "{{version}}" ]; then
+        VERSION="{{version}}"
+    else
+        echo "Querying GitHub releases for latest stable (>=14 days old)..."
+        VERSION=$(gh release list -R "$REPO" --exclude-drafts --exclude-pre-releases --json tagName,publishedAt --limit 20 -q '
+            [.[] | select((now - (.publishedAt | fromdateiso8601)) >= 1209600)]
+            | .[0].tagName
+        ')
+        [ -n "$VERSION" ] || { echo "ERROR: could not find a stable release"; exit 1; }
+    fi
+
+    echo "Installing handsets $VERSION"
+    # Use per-run temp dir to avoid reusing old archives
+    DOWNLOAD_DIR=$(mktemp -d)
+    trap "rm -rf $DOWNLOAD_DIR" EXIT
+    gh release download "$VERSION" -R "$REPO" --pattern "$ARCHIVE" -D "$DOWNLOAD_DIR"
+
+    echo "Extracting to $BIN_DIR"
+    mkdir -p "$BIN_DIR"
+    tar xzf "$DOWNLOAD_DIR/$ARCHIVE" -C "$BIN_DIR" --strip-components=1
+
+    echo "✅ Handsets $VERSION installed"
+
+# ── Git Hooks Setup ───────────────────────────────────────────
+# Install pre-commit hooks (replaces lefthook-generated hooks)
+#   just setup-hooks
+#
+# Note: This removes any lefthook-generated hooks and installs
+# pre-commit (https://pre-commit.com) with the project's
+# .pre-commit-config.yaml. Installs pre-commit, commit-msg (rejects
+# Co-Authored-By lines), and pre-push (runs all tests) hooks.
 setup-hooks:
-    git config core.hooksPath .githooks
+    #!/usr/bin/env bash
+    set -e
+    echo "Removing existing hooks..."
+    # Remove only pre-commit-managed hooks (those carrying the generated-hook
+    # marker), preserving any custom hooks the developer may have installed.
+    for h in pre-commit commit-msg pre-push; do
+        if [ -f ".git/hooks/$h" ] && grep -q "File generated by pre-commit" ".git/hooks/$h"; then
+            rm -f ".git/hooks/$h"
+        fi
+    done
+    echo "Installing pre-commit hooks..."
+    pre-commit install
+    pre-commit install --hook-type commit-msg
+    pre-commit install --hook-type pre-push
+    echo "✅ Git hooks installed (pre-commit, commit-msg, and pre-push)"
+
+# ── Run all tests in parallel ─────────────────────────────────────
+# Phase 1: Build main APK + compile test classes (single Gradle invocation)
+# Phase 2: Run unit tests and E2E in parallel (no more builds)
+test-all:
+    #!/usr/bin/env bash
+    set -e
+    # sdkman exists only on developer machines; CI uses actions/setup-java.
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+    command -v sdk >/dev/null 2>&1 && sdk env >/dev/null
+    echo "Phase 1: Compiling unit-test classes..."
+    cd android && ./gradlew compileDebugUnitTestKotlin && cd ..
+    echo "Phase 2: Running unit + E2E tests in parallel..."
+    just test & TEST_PID=$!
+    just test-e2e-transcribe & E2E_PID=$!
+    test_rc=0
+    e2e_rc=0
+    wait "$TEST_PID" || test_rc=$?
+    wait "$E2E_PID" || e2e_rc=$?
+    if [[ "$test_rc" -ne 0 || "$e2e_rc" -ne 0 ]]; then
+        echo "❌ Tests failed (unit rc=$test_rc, e2e rc=$e2e_rc)"
+        exit 1
+    fi
+    echo "✅ All tests passed"

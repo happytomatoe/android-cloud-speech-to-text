@@ -504,8 +504,8 @@ class MainActivity : AppCompatActivity() {
                 if (BuildConfig.DEBUG) SettingDropdown(R.id.spinner_use_test_file, USE_TEST_FILE, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
-                ), false) else null,
-                if (BuildConfig.DEBUG) SettingText(R.id.field_test_file_path, TEST_FILE_PATH, "/sdcard/test-speech-loud.wav") else null,
+                ), true) else null,
+                if (BuildConfig.DEBUG) SettingText(R.id.field_test_file_path, TEST_FILE_PATH, cacheDir.resolve("test-speech-loud.wav").absolutePath) else null,
             ).filterNotNull()
             val btnApply: Button = findViewById(R.id.btn_settings_apply)
             btnApply.isEnabled = false

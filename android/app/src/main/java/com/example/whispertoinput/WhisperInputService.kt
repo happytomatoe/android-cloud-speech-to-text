@@ -135,7 +135,11 @@ class WhisperInputService : InputMethodService() {
         if (restarting) return  // don't re-trigger on config changes
         CoroutineScope(Dispatchers.Main).launch {
             val autoStart = dataStore.data.map { prefs ->
-                prefs[AUTO_RECORDING_START] ?: false
+                // Default to true to match the settings UI (the auto-recording-start
+                // spinner defaults to "Yes") and this app's purpose as a voice IME.
+                // A fresh install opts into auto-start, but recording only actually
+                // begins once the keyboard is shown AND RECORD_AUDIO is granted.
+                prefs[AUTO_RECORDING_START] ?: true
             }.first()
             if (autoStart
                 && !recorderManager.isRecording
@@ -160,8 +164,9 @@ class WhisperInputService : InputMethodService() {
         if (BuildConfig.DEBUG) {
             CoroutineScope(Dispatchers.Main).launch {
                 val useTestFile = dataStore.data
-                    .map { it[USE_TEST_FILE] ?: false }
+                    .map { it[USE_TEST_FILE] ?: BuildConfig.DEBUG }
                     .first()
+                android.util.Log.d("whisper-input", "toggleRecording: useTestFile=$useTestFile, isDebug=${BuildConfig.DEBUG}")
 
                 if (useTestFile) {
                     if (testFileModeRecording) {
@@ -171,7 +176,7 @@ class WhisperInputService : InputMethodService() {
                         statusLabel?.text = getString(R.string.transcribing)
 
                         val testFilePath = dataStore.data
-                            .map { it[TEST_FILE_PATH] ?: "/sdcard/test-speech-loud.wav" }
+                            .map { it[TEST_FILE_PATH] ?: "/data/user/0/$packageName/cache/test-speech-loud.wav" }
                             .first()
 
                         whisperTranscriber.startAsync(this@WhisperInputService,

@@ -1,0 +1,4 @@
+# gitattributes configuration for rizzler
+# Generated automatically by rizzler setup
+
+*.yml merge=rizzler

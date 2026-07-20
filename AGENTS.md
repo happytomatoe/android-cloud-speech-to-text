@@ -79,7 +79,37 @@ for node in tree.iter('node'):
 
 XML gives exact text, bounds, and resource-ids — no OCR needed, faster than screenshots.
 
-## 4. Emulator console: use `adb emu`, not `nc`
+## 4. `hs` (handsets) — CLI for Android UI automation
+
+`hs` drives Android from the shell. Install via `just setup` (see section 1). The daemon must be running for most commands:
+
+```bash
+hs use                          # start daemon (needs adb in PATH)
+hs ui                           # flat table of tappable nodes
+hs tap "Continue"               # find by text, tap centre
+hs tap '\#back_btn'                # find by resource-id, tap centre
+hs fill 'id=com.example:id/field' 'text'  # atomic ACTION_SET_TEXT
+hs wait "Welcome"               # wait for text to appear
+hs drop                         # tear down daemon
+```
+
+**Getting docs:**
+- `hs --help` — full verb list and selector syntax
+- `hs fill --help` / `hs tap --help` — per-verb help
+- GitHub: <https://github.com/elliotgao2/handsets> (README + `docs/` folder)
+
+**Selector syntax (IMPORTANT — differs per verb):**
+- `hs tap` accepts `#short_id` (no package prefix) or plain text: `hs tap '#spinner'`, `hs tap 'Deepgram'`
+- `hs fill` uses `id=FULL_RESOURCE_ID`: `hs fill 'id=com.example:id/field' 'text'`
+- `hs find` uses `Tag[id=FULL_RESOURCE_ID]`: `hs find 'EditText[id=com.example:id/field]'`
+- `hs wait` accepts plain text: `hs wait 'Welcome'`
+- Relational pseudos (find only): `:below(SEL)`, `:near(SEL, PX)`, `:has-text("x")`
+- Pseudo-classes (find only): `:visible`, `:clickable`, `:enabled`, `:focused`
+- **Check return value:** Parse `--json` output for `"ok":true` — don't use `|| true` which masks failures
+
+**Common gotcha:** `hs use` (daemon startup) requires `adb` in PATH. Add `fish_add_path ~/Android/Sdk/platform-tools` to `~/.config/fish/config.fish`.
+
+## 5. Emulator console: use `adb emu`, not `nc`
 
 To send commands to the emulator console, always use `adb emu`:
 
@@ -93,7 +123,7 @@ adb emu kill
 echo "help" | nc localhost 5554
 ```
 
-## 5. Audio injection for STT testing — ALWAYS TEST SILENTLY
+## 6. Audio injection for STT testing — ALWAYS TEST SILENTLY
 
 **Golden rule: never play test audio to the default speaker sink.** The first E2E runs blasted the `espeak`/WAV test speech straight out of the host speakers — the user heard it and called it "scary" ("why are we using my audio"). Any audio you inject for STT must be routed into the emulator mic **without reaching the host speakers**.
 
@@ -128,15 +158,28 @@ Other injection options (also PulseAudio-corking-prone, and NOT silent on their 
 
 For CI/instrumented tests, consider mocking the `AudioRecord` layer directly.
 
-## 6. Think Before Coding
+## 7. Think Before Coding
 
 Don't assume. Don't hide confusion. Surface tradeoffs.
 State your assumptions explicitly. If uncertain, ask.
 
-## 7. Simplicity First
+## 8. Simplicity First
 
 Minimum code that solves the problem. Nothing speculative.
 
-## 8. Surgical Changes
+## 9. Surgical Changes
 
 Touch only what you must. Don't refactor adjacent code.
+
+## 10. No background processes unless asked
+
+Run commands in the **foreground** by default. Do not spawn background processes, daemons, `nohup`/`setsid`/`&` jobs, or tmux sessions unless the user explicitly asks for it. Project-required daemons such as `hs use` may be started by canonical workflow commands and must be cleaned up afterward.
+
+**Why:** A foreground run keeps the full command lifecycle (output, exit code, cleanup/`trap`) inside one tool call where it can be observed and verified. Background launches hide failures, detach from the calling shell, and make it easy to lose the result or leave orphaned processes (emulators, gradle daemons, hs daemons) running.
+
+**If a command is genuinely long-running** (e.g. a full build + emulator boot + E2E that exceeds the bash timeout), say so and ask the user whether they want it backgrounded — don't decide unilaterally.
+
+# Notes for agents
+
+- `sleep-i-am-sure` is a real project binary (in `~/.local/bin`, on PATH). It is **intentional**, not a typo for `sleep` — use it wherever a delay is needed (the no-bare-`sleep` extension blocks plain `sleep`).
+- Pre-push hooks run all tests (`just test-all`) before allowing a push. Use `just setup-hooks` to install all hooks (pre-commit, commit-msg, and pre-push).

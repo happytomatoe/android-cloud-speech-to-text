@@ -3,3 +3,13 @@
 test-sources/*.wav
 test-sources/*.mp3
 test-sources/*.ogg
+
+# E2E test logs
+e2e_test.log
+
+# Local state, editor, and tooling artifacts
+thoughts/
+.idea/
+.pi
+.emulator.pid
+skills-lock.json
