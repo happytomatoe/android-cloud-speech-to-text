@@ -1,0 +1,37 @@
+[
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -O3 -Wall -Wextra -g3 -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/voiceinput.cpp.o -c /var/home/l/git/voice-input/app/src/main/cpp/voiceinput.cpp",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/voiceinput.cpp"
+},
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -O3 -Wall -Wextra -g3 -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/ggml/whisper.cpp.o -c /var/home/l/git/voice-input/app/src/main/cpp/ggml/whisper.cpp",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/ggml/whisper.cpp"
+},
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/ggml/ggml.c.o -c /var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml.c",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml.c"
+},
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/ggml/ggml-alloc.c.o -c /var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml-alloc.c",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml-alloc.c"
+},
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/ggml/ggml-backend.c.o -c /var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml-backend.c",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml-backend.c"
+},
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/ggml/ggml-quants.c.o -c /var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml-quants.c",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/ggml/ggml-quants.c"
+},
+{
+  "directory": "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+  "command": "/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=armv7-none-linux-androideabi24 --sysroot=/var/home/l/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dvoiceinput_EXPORTS -O3 -Wall -Wextra -g3 -fno-limit-debug-info  -fPIC -mfpu=neon -o CMakeFiles/voiceinput.dir/jni_common.cpp.o -c /var/home/l/git/voice-input/app/src/main/cpp/jni_common.cpp",
+  "file": "/var/home/l/git/voice-input/app/src/main/cpp/jni_common.cpp"
+}
+]

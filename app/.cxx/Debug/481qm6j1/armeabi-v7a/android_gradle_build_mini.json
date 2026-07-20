@@ -1,0 +1,27 @@
+{
+  "buildFiles": [
+    "/var/home/l/git/voice-input/app/src/main/cpp/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/var/home/l/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/var/home/l/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "voiceinput::@6890427a1f51a3e7e1df": {
+      "artifactName": "voiceinput",
+      "abi": "armeabi-v7a",
+      "output": "/var/home/l/git/voice-input/app/build/intermediates/cxx/Debug/481qm6j1/obj/armeabi-v7a/libvoiceinput.so",
+      "runtimeFiles": []
+    }
+  }
+}

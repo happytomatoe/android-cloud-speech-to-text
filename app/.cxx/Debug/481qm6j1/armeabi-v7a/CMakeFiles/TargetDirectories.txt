@@ -1,0 +1,3 @@
+/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a/CMakeFiles/voiceinput.dir
+/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a/CMakeFiles/edit_cache.dir
+/var/home/l/git/voice-input/app/.cxx/Debug/481qm6j1/armeabi-v7a/CMakeFiles/rebuild_cache.dir
