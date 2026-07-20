@@ -37,13 +37,9 @@ private const val MEDIA_RECORDER_CONSTRUCTOR_DEPRECATION_API_LEVEL = 31
  */
 class RecorderManager {
     companion object {
-        // Recording only needs the microphone. We deliberately do NOT require
-        // POST_NOTIFICATIONS here: the recorder uses MediaRecorder directly and
-        // shows no foreground notification, so a missing notification permission
-        // must not block (auto-)recording — especially on a fresh install where
-        // the user may not have granted it yet.
         fun requiredPermissions() = arrayOf(
             Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.POST_NOTIFICATIONS
         )
     }
 
