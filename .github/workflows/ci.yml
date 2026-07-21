@@ -3,6 +3,12 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   build:
@@ -25,18 +31,72 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/robolectric
-          key: robolectric-sdk-${{ hashFiles('android/app/build.gradle.kts') }}
+          key: robolectric-sdk-${{ hashFiles('app/build.gradle') }}
           restore-keys: |
             robolectric-sdk-
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --parallel
-        working-directory: android
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: android/app/build/reports/tests/testDebugUnitTest
+          path: app/build/reports/tests/testDebugUnitTest
           retention-days: 7
+
+      - name: Build dev debug APK
+        run: ./gradlew assembleDevDebug --no-daemon --parallel --build-cache
+
+      - name: Upload dev debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-input-dev-debug
+          path: app/build/outputs/apk/dev/debug/app-dev-debug.apk
+          retention-days: 14
+
+      - name: Post APK link to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- ci-apk-link -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const artifactUrl = `${runUrl}#artifacts`;
+            const body = `${marker}
+            ## 📦 Build APK Ready
+            
+            Download the **dev debug APK** from the [CI artifacts](${artifactUrl}).
+            
+            | Variant | Package |
+            |---------|----------|
+            | devDebug | org.futo.voiceinput.dev |
+            
+            _Updated: ${new Date().toISOString()}_`;
+
+            // Find existing comment with our marker
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+              core.info(`Updated existing comment #${existing.id}`);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+              core.info('Created new comment');
+            }

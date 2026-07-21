@@ -3,3 +3,29 @@
 test-sources/*.wav
 test-sources/*.mp3
 test-sources/*.ogg
+
+# Build artifacts
+.gradle/
+build/
+app/.cxx/
+app/build/
+
+# IDE / local config
+.idea/
+*.iml
+local.properties
+
+# OS
+.DS_Store
+
+# Evidence files from E2E tests
+e2e_*.png
+e2e_*.log
+e2e_*.txt
+
+# Agent config
+.pi/
+
+# Handsets daemon
+hs.sock
+
