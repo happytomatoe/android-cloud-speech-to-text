@@ -73,6 +73,11 @@ fun TestScreen(
         if (BuildConfig.DEBUG) {
             debugTranscriptionResult.value = VoiceInputMethodService.lastTranscriptionResult
             debugTranscriptionError.value = VoiceInputMethodService.lastTranscriptionError
+            // Also write into the real field so the IME commitText path is provable
+            val result = VoiceInputMethodService.lastTranscriptionResult
+            if (result != null && result != text) {
+                text = result
+            }
         }
     }
 
