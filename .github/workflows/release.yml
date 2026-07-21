@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: 'Version bump type'
+        description: 'Version bump type (stable only)'
         required: true
         default: 'patch'
         type: choice
@@ -41,6 +41,17 @@ jobs:
         with:
           cache-read-only: true
 
+      - name: Detect release type
+        id: type
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "release_type=stable" >> "$GITHUB_OUTPUT"
+            echo "📌 Release type: stable"
+          else
+            echo "release_type=snapshot" >> "$GITHUB_OUTPUT"
+            echo "📌 Release type: snapshot"
+          fi
+
       - name: Get current version
         id: current
         run: |
@@ -55,43 +66,68 @@ jobs:
         run: |
           CURRENT="${{ steps.current.outputs.name }}"
           BUMP="${{ inputs.bump }}"
+          RELEASE_TYPE="${{ steps.type.outputs.release_type }}"
 
-          if [ "$BUMP" = "skip" ]; then
-            echo "⏭️ Skipping release"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          # For snapshots, use current version without bumping
+          if [ "$RELEASE_TYPE" = "snapshot" ]; then
+            NEW_VERSION="$CURRENT"
+            NEW_CODE="${{ steps.current.outputs.code }}"
+            TAG_SUFFIX="-snapshot"
+            echo "📦 Snapshot: using current version $CURRENT"
+          else
+            # For stable, bump version
+            if [ "$BUMP" = "skip" ]; then
+              echo "⏭️ Skipping release"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+            case "$BUMP" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+              *)
+                echo "⚠️ Unknown bump: $BUMP, defaulting to patch"
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+            NEW_CODE=$((${{ steps.current.outputs.code }} + 1))
+            TAG_SUFFIX=""
+            echo "✅ Stable: bumping $CURRENT → $NEW_VERSION"
           fi
 
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-
-          case "$BUMP" in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-            *)
-              echo "⚠️ Unknown bump: $BUMP, defaulting to patch"
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          NEW_CODE=$((${{ steps.current.outputs.code }} + 1))
+          # For snapshots, add branch name to tag to allow multiple releases
+          if [ "$RELEASE_TYPE" = "snapshot" ]; then
+            BRANCH_NAME="${GITHUB_REF_NAME}"
+            # Sanitize: replace / with - and remove any characters not safe for tags
+            BRANCH_SAFE="${BRANCH_NAME//\//-}"
+            BRANCH_SAFE="${BRANCH_SAFE//[^a-zA-Z0-9._-]/-}"
+            FULL_VERSION="${NEW_VERSION}${TAG_SUFFIX}-${BRANCH_SAFE}"
+          else
+            FULL_VERSION="${NEW_VERSION}"
+          fi
 
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "full_version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
           echo "code=$NEW_CODE" >> "$GITHUB_OUTPUT"
-          echo "🏷️ New version: $NEW_VERSION (code: $NEW_CODE)"
+          echo "🏷️ New version: $FULL_VERSION (code: $NEW_CODE)"
 
       - name: Update version in build.gradle.kts
-        if: steps.new.outputs.skip != 'true'
+        if: steps.new.outputs.skip != 'true' && steps.new.outputs.release_type == 'stable'
         run: |
           sed -i "s/versionName = \"${{ steps.current.outputs.name }}\"/versionName = \"${{ steps.new.outputs.version }}\"/" app/build.gradle
           sed -i "s/versionCode = ${{ steps.current.outputs.code }}/versionCode = ${{ steps.new.outputs.code }}/" app/build.gradle
@@ -106,17 +142,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.new.outputs.version }}"
+          VERSION="${{ steps.new.outputs.full_version }}"
+          RELEASE_TYPE="${{ steps.new.outputs.release_type }}"
           APK_PATH="app/build/outputs/apk/release/app-release.apk"
+
+          # For snapshots, delete existing release if it exists (to allow re-release)
+          if [ "$RELEASE_TYPE" = "snapshot" ]; then
+            echo "🔍 Checking for existing snapshot release..."
+            if gh release view "v$VERSION" > /dev/null 2>&1; then
+              echo "🗑️ Deleting existing release v$VERSION"
+              gh release delete "v$VERSION" --yes --cleanup-tag
+            fi
+          fi
 
           # Create tag
           git tag "v$VERSION"
           git push origin "v$VERSION"
 
+          # Get branch name for snapshot releases
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          # Sanitize branch name for use in title (replace / with -)
+          BRANCH_SAFE="${BRANCH_NAME//\//-}"
+
+          # Create release notes
+          if [ "$RELEASE_TYPE" = "snapshot" ]; then
+            RELEASE_NOTES="## 📦 Download APK
+
+[Click here to download](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/whisper-to-input-v${VERSION}.apk)
+
+---
+
+⚠️ **This is a snapshot build** — may be unstable.
+
+_Branch: \`${BRANCH_NAME}\` | Commit: \`${GITHUB_SHA::7}\`_"
+          else
+            RELEASE_NOTES="## 📦 Download APK
+
+[Click here to download](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/whisper-to-input-v${VERSION}.apk)"
+          fi
+
           # Create release with APK
+          if [ "$RELEASE_TYPE" = "snapshot" ]; then
+            RELEASE_TITLE="v${VERSION} (${BRANCH_SAFE})"
+          else
+            RELEASE_TITLE="v$VERSION"
+          fi
+
           gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --generate-notes \
+            --title "$RELEASE_TITLE" \
+            --notes "$RELEASE_NOTES" \
             "$APK_PATH#whisper-to-input-v$VERSION.apk"
 
-          echo "🎉 Released v$VERSION"
+          echo "🎉 Released v$VERSION (${RELEASE_TYPE})"
