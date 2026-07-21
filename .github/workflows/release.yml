@@ -44,8 +44,8 @@ jobs:
       - name: Get current version
         id: current
         run: |
-          VERSION_NAME=$(grep 'versionName' android/app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'versionCode' android/app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
+          VERSION_NAME=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/')
+          VERSION_CODE=$(grep 'versionCode' app/build.gradle | sed 's/.*= \([0-9]*\).*/\1/')
           echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "📌 Current: $VERSION_NAME (code: $VERSION_CODE)"
@@ -93,14 +93,13 @@ jobs:
       - name: Update version in build.gradle.kts
         if: steps.new.outputs.skip != 'true'
         run: |
-          sed -i "s/versionName = \"${{ steps.current.outputs.name }}\"/versionName = \"${{ steps.new.outputs.version }}\"/" android/app/build.gradle.kts
-          sed -i "s/versionCode = ${{ steps.current.outputs.code }}/versionCode = ${{ steps.new.outputs.code }}/" android/app/build.gradle.kts
+          sed -i "s/versionName = \"${{ steps.current.outputs.name }}\"/versionName = \"${{ steps.new.outputs.version }}\"/" app/build.gradle
+          sed -i "s/versionCode = ${{ steps.current.outputs.code }}/versionCode = ${{ steps.new.outputs.code }}/" app/build.gradle
           echo "✅ Updated build.gradle.kts"
 
       - name: Build Release APK
         if: steps.new.outputs.skip != 'true'
         run: ./gradlew assembleRelease --no-daemon --parallel --build-cache
-        working-directory: android
 
       - name: Create GitHub Release
         if: steps.new.outputs.skip != 'true'
@@ -108,7 +107,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.new.outputs.version }}"
-          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
 
           # Create tag
           git tag "v$VERSION"
