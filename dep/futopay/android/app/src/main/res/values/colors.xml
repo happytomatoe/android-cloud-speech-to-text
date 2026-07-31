@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#ff475569</color>
+    <color name="pastel_red">#C25353</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="button_primary">#ff475569</color>
+    <color name="button_black">#ff1e293b</color>
+    <color name="background_text_input">#0f172a</color>
+    <color name="background_payment_overlay">#ff0f172a</color>
+    <color name="text_cancel_payment_overlay">#94a3b8</color>
+</resources>

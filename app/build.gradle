@@ -1,0 +1,247 @@
+plugins {
+    id 'com.android.application'
+    id 'io.github.jmatsu.license-list' version '0.8.1'
+    id 'org.jetbrains.kotlin.android' version '2.1.0'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '2.1.0'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+
+licenseList {
+    defaultVariant = "freeRelease"
+}
+
+android {
+    namespace 'org.futo.voiceinput'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "org.futo.voiceinput"
+        minSdk 24
+        targetSdk 35
+        versionCode 28
+        versionName "1.3.6"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary true
+        }
+        externalNativeBuild {
+            cmake {
+                cppFlags '-O3'
+            }
+        }
+    }
+
+    final def keystorePropertiesFile = rootProject.file("keystore.properties")
+    def releaseSigning = signingConfigs.debug
+    if (keystorePropertiesFile.exists()) {
+        final def keystoreProperties = new Properties()
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+        releaseSigning = signingConfigs.create("release") {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile rootProject.file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+        }
+    } else {
+    	project.logger.lifecycle('keystore.properties not found, APK may not be signed')
+    }
+
+    final def crashReportPropertiesFile = rootProject.file("crashreporting.properties")
+    final def crashReportProperties = new Properties()
+    if (crashReportPropertiesFile.exists()) {
+        crashReportProperties.load(new FileInputStream(crashReportPropertiesFile))
+    } else {
+        project.logger.lifecycle('crashreporting.properties not found, crash reporting will be disabled')
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig releaseSigning
+        }
+
+        buildTypes.each {
+            if (crashReportPropertiesFile.exists()) {
+                it.buildConfigField "boolean", "ENABLE_ACRA", crashReportProperties['acraEnabled']
+                it.buildConfigField "String", "ACRA_URL", crashReportProperties['acraUrl']
+                it.buildConfigField "String", "ACRA_USER", crashReportProperties['acraUser']
+                it.buildConfigField "String", "ACRA_PASSWORD", crashReportProperties['acraPassword']
+            } else {
+                it.buildConfigField "boolean", "ENABLE_ACRA", "false"
+                it.buildConfigField "String", "ACRA_URL", "null"
+                it.buildConfigField "String", "ACRA_USER", "null"
+                it.buildConfigField "String", "ACRA_PASSWORD", "null"
+            }
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    buildFeatures {
+        compose true
+        viewBinding true
+        mlModelBinding true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.4.6'
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+
+    flavorDimensions "version"
+    productFlavors {
+        playStore {
+            dimension "version"
+        }
+
+        standalone {
+            dimension "version"
+        }
+
+        fDroid {
+            dimension "version"
+        }
+
+        dev {
+            dimension "version"
+            versionNameSuffix "-dev"
+            applicationIdSuffix ".dev"
+        }
+
+        devSameId {
+            dimension "version"
+            versionNameSuffix "-devSameId"
+        }
+    }
+
+    sourceSets {
+        dev {
+            // Include update checking for testing
+            java.srcDir 'src/withUpdateChecking/java'
+
+            // Include only the payments directories, not the dummy directories, to compile both billing methods
+            java.srcDir 'src/playStoreBilling/java/org/futo/voiceinput/payments'
+            java.srcDir 'src/payPalBilling/java/org/futo/voiceinput/payments'
+            res.srcDir 'src/payPalBilling/res'
+
+            // Include dev code
+            java.srcDir 'src/dev/java'
+        }
+
+        devSameId {
+            // Include update checking for testing
+            java.srcDir 'src/withUpdateChecking/java'
+
+            // Include only the payments directories, not the dummy directories, to compile both billing methods
+            java.srcDir 'src/playStoreBilling/java/org/futo/voiceinput/payments'
+            java.srcDir 'src/payPalBilling/java/org/futo/voiceinput/payments'
+            res.srcDir 'src/payPalBilling/res'
+
+            // Include dev code
+            java.srcDir 'src/dev/java'
+        }
+
+        playStore {
+            // Updates are handled by Play Store
+            java.srcDir 'src/withoutUpdateChecking/java'
+
+            // Include only Play Store billing
+            java.srcDir 'src/playStoreBilling/java'
+
+            // Include non-dev code
+            java.srcDir 'src/nonDev/java'
+        }
+
+        fDroid {
+            // Updates are handled by F-Droid
+            java.srcDir 'src/withoutUpdateChecking/java'
+
+            // Include only PayPal billing, do not depend on Play Store billing
+            java.srcDir 'src/payPalBilling/java'
+            res.srcDir 'src/payPalBilling/res'
+
+            // Include non-dev code
+            java.srcDir 'src/nonDev/java'
+        }
+
+        standalone {
+            // It is our responsibility to handle updates
+            java.srcDir 'src/withUpdateChecking/java'
+
+            // Include only PayPal billing, do not depend on Play Store billing
+            java.srcDir 'src/payPalBilling/java'
+            res.srcDir 'src/payPalBilling/res'
+
+            // Include non-dev code
+            java.srcDir 'src/nonDev/java'
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime:2.6.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.6.1'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1'
+    implementation 'androidx.activity:activity-compose:1.7.2'
+    implementation platform('androidx.compose:compose-bom:2022.10.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.navigation:navigation-compose:2.6.0'
+
+    implementation(name:'vad-release', ext:'aar')
+    implementation(name:'pocketfft-release', ext:'aar')
+
+    implementation 'androidx.datastore:datastore-preferences:1.0.0'
+
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation platform('androidx.compose:compose-bom:2022.10.00')
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+
+    implementation 'ch.acra:acra-http:5.11.1'
+    implementation 'ch.acra:acra-dialog:5.11.1'
+
+    // TODO: Is there an easier way of doing this
+    devImplementation        project(":dep:futopay:android:app")
+    devSameIdImplementation  project(":dep:futopay:android:app")
+    fDroidImplementation     project(":dep:futopay:android:app")
+    standaloneImplementation project(":dep:futopay:android:app")
+
+
+    def billing_version = "8.0.0"
+    playStoreImplementation "com.android.billingclient:billing:$billing_version"
+    playStoreImplementation "com.android.billingclient:billing-ktx:$billing_version"
+    devImplementation "com.android.billingclient:billing:$billing_version"
+    devImplementation "com.android.billingclient:billing-ktx:$billing_version"
+    devSameIdImplementation "com.android.billingclient:billing:$billing_version"
+    devSameIdImplementation "com.android.billingclient:billing-ktx:$billing_version"
+}

@@ -1,132 +1,95 @@
-# Whisper To Input
+# FUTO Voice Input
 
-Whisper To Input (輕聲細語輸入法) is an Android keyboard that performs speech-to-text (STT/ASR) using cloud APIs and inputs the recognized text. Supports English, Chinese, Japanese, and more — including mixed languages and Taiwanese.
+FUTO Voice Input is an application that lets you do speech-to-text on Android, integrating with third party keyboards or apps that use the generic speech-to-text APIs.
 
-> **This is a fork of [j3soon/whisper-to-input](https://github.com/j3soon/whisper-to-input)** with additional backends and features.
+To download the application, visit the [FUTO Voice Input page](https://voiceinput.futo.org/). You can also find the contact there to report issues or suggestions.
 
-## Supported Backends
+If you have any feedback, issues are welcomed on the [public issue tracker](https://github.com/futo-org/voice-input/issues). Private inquiries are welcomed at the support email listed on the [website](https://voiceinput.futo.org/), or via the Send Feedback button in-app.
 
-| Backend | Type | API Key Required |
-|---------|------|------------------|
-| [Voxtral (Mistral)](https://docs.mistral.ai/api/#tag/audio/operation/createTranscription) | Cloud | ✅ |
-| [ElevenLabs Scribe](https://elevenlabs.io/docs/api-reference/speech-to-text) | Cloud | ✅ |
-| [Deepgram](https://developers.deepgram.com/reference/pre-recorded) | Cloud | ✅ |
-| [Groq](https://console.groq.com/docs/speech-to-text) | Cloud | ✅ |
-| [60db](https://docs.60db.ai/api-reference/introduction) | Cloud | ✅ |
+## Status
 
-## Installation
+Development has largely shifted focus to the [FUTO Keyboard app](https://keyboard.futo.org/), which has voice input built-in. However, FUTO Voice Input will remain available if you prefer to use it with another keyboard.
 
-1. Download the APK from [Releases](https://github.com/happytomatoe/android-cloud-speech-to-text/releases/latest)
-2. Install the APK on your Android device
-3. Allow microphone and notification permissions
-4. Open the app and configure your backend (API key, endpoint, model)
-5. Enable the keyboard in System Settings → Languages & Input → On-screen keyboard
-6. Select "Whisper Input" as your input method
+## API support
 
-## Configuration Examples
+The following APIs are supported:
+* `android.speech.action.RECOGNIZE_SPEECH` implicit intent, for apps and some keyboards - this opens the floating window in the center of the screen
+* IME with `voice` subtype mode, for keyboards - this opens on the bottom half of the screen in place of the keyboard
 
-**Voxtral (Mistral):**
-```
-Endpoint:   https://api.mistral.ai/v1/audio/transcriptions
-API Key:    <your key>
-Model:      voxtral-mini-latest
-Language:   auto
-```
+Currently this does not support the SpeechRecognizer API, which few apps seem to use. Support for this is planned in the future.
 
-**ElevenLabs Scribe:**
-```
-Endpoint:   https://api.elevenlabs.io/v1/speech-to-text
-API Key:    <your key>
-Model:      scribe_v1
-Language:   auto
-```
+## Keyboard support
 
-**Deepgram:**
-```
-Endpoint:   https://api.deepgram.com/v1/listen
-API Key:    <your key>
-Model:      nova-3
-Language:   auto
-```
+Keyboard support is touched on in the Help section of the app. In short, the following keyboards are supported:
+* [**FUTO Keyboard**](https://keyboard.futo.org/) has FUTO Voice Input built-in; if you want to force it to use the external app you have to disable built-in voice input in its settings
+* [**HeliBoard**](https://github.com/Helium314/HeliBoard)
+* [**FlorisBoard**](https://github.com/florisboard/florisboard) supports it on newer releases
+* [**AnySoftKeyboard**](https://github.com/AnySoftKeyboard/AnySoftKeyboard)
+* [**Unexpected Keyboard**](https://github.com/Julow/Unexpected-Keyboard) (v1.23+)
+* **AOSP Keyboard** available in LineageOS and others
 
-**Groq:**
-```
-Endpoint:   https://api.groq.com/openai/v1/audio/transcriptions
-API Key:    <your key>
-Model:      whisper-large-v3-turbo
-Language:   auto
-```
+If you're okay with using proprietary keyboards, the following are supported:
+* **Grammarly Keyboard**, which uses the IME
+* **Microsoft SwiftKey**, which uses the implicit intent
 
-**60db:**
-```
-Endpoint:   https://api.60db.ai/stt
-API Key:    <your key>
-Model:      60db-stt-v01
-Language:   auto
-```
+Incompatible keyboards:
+* **Gboard** - hardcoded to use Google's voice input, does not support third-party options
+* **Samsung Keyboard** - hardcoded to only allow either Samsung Voice Input, or Google Voice Input
+* **Simple Keyboard** by Raimondas Rimkus - [no voice button](https://github.com/rkkr/simple-keyboard/issues/133)
+* **Simple Keyboard** by Simple Mobile Tools - [no voice button](https://github.com/SimpleMobileTools/Simple-Keyboard/issues/201)
+* **TypeWise** - no voice button [but suggestion filed in 2019](https://suggestions.typewise.app/suggestions/65517/voice-to-text-dictation)
 
-## Keyboard Usage
+## Language support
 
-- **Microphone** (center): Tap to start/stop recording
-- **Cancel** (left of mic): Cancel recording or transcription
-- **Retry** (left of mic, shown on error): Retry the last transcription
-- **Backspace** (right of mic): Delete previous character
-- **Enter** (right of backspace): Newline (stops recording if active)
-- **Space Bar** (bottom center): Insert space (stops recording if active)
-- **Settings** (upper right): Open app settings
-- **Switch** (upper left): Switch to previous input method
+FUTO Voice Input is currently based on the OpenAI Whisper model, and could theoretically support all of the languages that OpenAI Whisper supports. However, in practice, the smaller models tend to not perform too good with languages that had fewer training hours. To avoid presenting something worse than nothing, only languages with more than 1,000 training hours are included as options in the UI:
+* English
+* Chinese (currently has some weird behavior between traditional/simplified)
+* German
+* Spanish
+* Russian
+* French
+* Portuguese
+* Korean
+* Japanese
+* Turkish
+* Polish
+* Italian
+* Swedish
+* Dutch
+* Catalan
+* Finnish
+* Indonesian
 
-## Building
+Language support and accuracy may expand in the future with better optimization and fine-tuned models. Feedback is welcomed about language-related issues or general language accuracy.
 
+## Development
+
+You can develop this app by opening it in Android Studio. Otherwise, you can use Gradle to build the app like so:
 ```bash
-# Debug APK
-just build
-
-# Or manually
-cd android && ./gradlew assembleDebug
+./gradlew assembleStandaloneRelease
 ```
 
-The APK will be at `android/app/build/outputs/apk/debug/app-debug.apk`.
+There are four build flavors:
+* `dev` - for development, includes Play Store billing and all payment methods, auto-update, etc
+* `playStore` - Play Store build, does not include auto-update and only includes Play Store billing
+* `standalone` - does not include Play Store billing library, includes auto-update
+* `fDroid` - does not include Play Store billing nor auto-update
 
-## CI/CD
-
-This project uses GitHub Actions for automated releases:
-
-- **CI** (`ci.yml`): Builds debug APK on PRs
-- **Release** (`release.yml`): Auto-versioning and GitHub release on merge to `main`
-- **Auto-label** (`auto-label.yml`): Labels PRs based on conventional commit titles
-
-### Versioning
-
-PR labels control version bumps:
-- `major` → 0.5.0 → 1.0.0
-- `minor` → 0.5.0 → 0.6.0
-- `patch` → 0.5.0 → 0.5.1
-- `skip-release` → No release
-
-PR titles with conventional commits (`feat:`, `fix:`, etc.) are auto-labeled.
-
-## Debugging
-
-Enable [USB debugging](https://developer.android.com/studio/debug/dev-options), connect your phone, and use:
-
-```bash
-adb logcat *:D  # Debug logs
-adb logcat *:E  # Errors only
-```
-
-## Permissions
-
-- `RECORD_AUDIO`: Required for voice input
-- `INTERNET`: Required for cloud API calls
-- `POST_NOTIFICATIONS`: Required for background error toasts
+Some prebuilt binaries are included in the `libs` directory to make the build faster, there are also instructions to build them yourself.
 
 ## License
 
-GPLv3 — see [LICENSE](android/LICENSE)
+This code is currently licensed under the [FUTO Source First License 1.0](LICENSE.md)
 
-**Original project:** [j3soon/whisper-to-input](https://github.com/j3soon/whisper-to-input)
-**Original contributors:** Yan-Bin Diau ([@tigerpaws01](https://github.com/tigerpaws01)), Johnson Sun ([@j3soon](https://github.com/j3soon)), Ying-Chou Sun ([@ijsun](https://github.com/ijsun))
+## Credits
 
+The microphone icon was taken from [Feather Icons](https://feathericons.com/), an open-source icon pack authored by Cole Bemis.
 
-
+Thanks to the following projects for making this possible:
+* OpenAI - [OpenAI Whisper](https://github.com/openai/whisper/)
+* Georgi Gerganov - [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
+* TensorFlow Authors - [TensorFlow Lite](https://mvnrepository.com/artifact/org.tensorflow/tensorflow-lite) (tflite was used in the past, it's no longer used)
+* Max-Planck-Society - [PocketFFT](https://gitlab.mpcdf.mpg.de/mtr/pocketfft/-/blob/master/LICENSE.md)
+* The WebRTC project authors - [WebRTC VAD](https://github.com/abb128/android-vad/blob/main/vad/src/main/jni/webrtc_vad/LICENSE)
+* Georgiy Konovalov - [android-vad](https://github.com/abb128/android-vad)
+* Other app dependencies, listed in app/build.gradle

@@ -10,6 +10,23 @@ e2e_test.log
 # Local state, editor, and tooling artifacts
 thoughts/
 .idea/
-.pi
+*.iml
+local.properties
+.pi/
 .emulator.pid
 skills-lock.json
+hs.sock
+
+# Build artifacts
+.gradle/
+build/
+app/.cxx/
+app/build/
+
+# OS
+.DS_Store
+
+# Evidence files from E2E tests
+e2e_*.png
+e2e_*.log
+e2e_*.txt
