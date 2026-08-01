@@ -561,10 +561,18 @@ if [[ -z "$BACKEND" || -z "$EXPECTED" ]]; then
     die "Missing required arguments. Use --help for usage."
 fi
 
-# API key from env var fallback
+# API key resolution: --key flag → env var → auto-rotate for Voxtral
 if [[ -z "$API_KEY" ]]; then
     api_var="${BACKEND^^}_KEY"
     API_KEY="${!api_var:-}"
+fi
+if [[ -z "$API_KEY" && "$BACKEND" == "voxtral" ]]; then
+    log_info "No VOXTRAL_KEY set — rotating Mistral API key..."
+    API_KEY=$(cd /var/home/l/git/mistral && bun run mistral-rotate-rest.ts 2>/dev/null)
+    if [[ -z "$API_KEY" ]]; then
+        die "Failed to rotate Mistral API key"
+    fi
+    log_ok "Rotated Mistral API key: ${API_KEY:0:8}..."
 fi
 if [[ -z "$API_KEY" ]]; then
     die "No API key provided. Use --key or set ${BACKEND^^}_KEY environment variable."
