@@ -193,7 +193,7 @@ config = BACKEND_CONFIG['$backend']
 entries = b''
 backend_display = {
     'deepgram': 'Deepgram', 'groq': 'Groq', '60db': '60db',
-    'elevenlabs': 'ElevenLabs Scribe', 'parakeet': 'Groq',
+    'voxtral': 'Voxtral (Mistral)', 'elevenlabs': 'ElevenLabs Scribe', 'parakeet': 'Groq',
 }
 entries += encode_map_string_entry('speech-to-text-backend', backend_display['$backend'])
 entries += encode_map_string_entry('endpoint', config['endpoint'])
@@ -539,7 +539,7 @@ Real device E2E test using the app's built-in test file mode.
 No mic injection needed — the app reads from app-private storage directly.
 
 Options:
-  --backend     Backend to test (deepgram, groq, 60db, elevenlabs)
+  --backend     Backend to test (deepgram, groq, 60db, voxtral, elevenlabs)
   --key         API key for the backend
   --expected    Expected substring in transcription result
   --skip-build  Skip APK build and install (use existing installation)

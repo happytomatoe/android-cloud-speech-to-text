@@ -64,6 +64,7 @@ declare -A BACKEND_ENDPOINT=(
     ["groq"]="https://api.groq.com/openai/v1/audio/transcriptions"
     ["60db"]="https://api.60db.ai/stt"
     ["elevenlabs"]="https://api.elevenlabs.io/v1/speech-to-text"
+    ["voxtral"]="https://api.mistral.ai/v1/audio/transcriptions"
     ["parakeet"]="http://10.0.2.2:5092/v1/audio/transcriptions"
 )
 
@@ -72,6 +73,7 @@ declare -A BACKEND_MODEL=(
     ["groq"]="whisper-large-v3-turbo"
     ["60db"]="60db-stt-v01"
     ["elevenlabs"]="scribe_v1"
+    ["voxtral"]="voxtral-mini-latest"
     ["parakeet"]="parakeet-tdt-0.6b"
 )
 
@@ -80,6 +82,7 @@ declare -A BACKEND_DISPLAY=(
     ["groq"]="Groq"
     ["60db"]="60db"
     ["elevenlabs"]="ElevenLabs Scribe"
+    ["voxtral"]="Voxtral (Mistral)"
     ["parakeet"]="Groq"  # Uses Groq request format in app
 )
 
@@ -796,10 +799,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             cat <<EOF
-Usage: $0 --backend <deepgram|groq|60db|parakeet> --key <API_KEY> --expected <substring> [--headful]
+Usage: $0 --backend <deepgram|groq|60db|voxtral|parakeet> --key <API_KEY> --expected <substring> [--headful]
 
 Options:
-  --backend   Backend to test (deepgram, groq, 60db, parakeet)
+  --backend   Backend to test (deepgram, groq, 60db, voxtral, parakeet)
   --key       API key for the backend
   --expected  Expected substring in transcription result
   --headful   Run emulator with visible window (default: headless)
@@ -824,7 +827,7 @@ fi
 
 # Validate backend
 if [[ ! "${BACKEND_DISPLAY[$BACKEND]+_}" ]]; then
-    die "Invalid backend: $BACKEND (must be deepgram, groq, 60db, elevenlabs, or parakeet)"
+    die "Invalid backend: $BACKEND (must be deepgram, groq, 60db, voxtral, elevenlabs, or parakeet)"
 fi
 
 # API key: explicit arg → env var → embedded default

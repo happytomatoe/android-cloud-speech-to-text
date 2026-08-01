@@ -94,10 +94,20 @@ BACKEND_CONFIG = {
         "model": "60db-stt-v01",
         "language_code": "",
     },
+    "voxtral": {
+        "endpoint": "https://api.mistral.ai/v1/audio/transcriptions",
+        "model": "voxtral-mini-latest",
+        "language_code": "auto",
+    },
     "elevenlabs": {
         "endpoint": "https://api.elevenlabs.io/v1/speech-to-text",
         "model": "scribe_v1",
         "language_code": "auto",
+    },
+    "parakeet": {
+        "endpoint": "http://10.0.2.2:5092/v1/audio/transcriptions",
+        "model": "parakeet-tdt-0.6b",
+        "language_code": "",
     },
 }
 
@@ -110,7 +120,9 @@ def build_preferences(backend: str, api_key: str) -> bytes:
         "deepgram": "Deepgram",
         "groq": "Groq",
         "60db": "60db",
+        "voxtral": "Voxtral (Mistral)",
         "elevenlabs": "ElevenLabs Scribe",
+        "parakeet": "Groq",  # Uses Groq request format
     }
     entries += encode_map_string_entry("speech-to-text-backend", backend_display[backend])
     entries += encode_map_string_entry("endpoint", config["endpoint"])
@@ -128,8 +140,8 @@ def build_preferences(backend: str, api_key: str) -> bytes:
 
 def main():
     parser = argparse.ArgumentParser(description="Write whisper-to-input DataStore preferences")
-    parser.add_argument("--backend", required=True, choices=["deepgram", "groq", "60db", "elevenlabs"])
-    parser.add_argument("--key", required=True, help="API key for the backend")
+    parser.add_argument("--backend", required=True, choices=["deepgram", "groq", "60db", "voxtral", "elevenlabs", "parakeet"])
+    parser.add_argument("--key", default="", help="API key for the backend (not required for parakeet)")
     parser.add_argument("-o", "--output", help="Output file (default: stdout)")
     args = parser.parse_args()
 
