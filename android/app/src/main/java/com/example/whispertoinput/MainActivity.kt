@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
 // 200 and 201 are an arbitrary values, as long as they do not conflict with each other
 private const val MICROPHONE_PERMISSION_REQUEST_CODE = 200
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 201
-const val NOTIFICATION_CHANNEL_ID = "whisper_to_input_channel"
+const val NOTIFICATION_CHANNEL_ID = "cloud_speech_to_text_channel"
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 val SPEECH_TO_TEXT_BACKEND = stringPreferencesKey("speech-to-text-backend")
 val ENDPOINT = stringPreferencesKey("endpoint")

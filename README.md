@@ -15,8 +15,6 @@ This is a fork of [whisper-to-input](https://github.com/j3soon/whisper-to-input)
 
 ## Installation
 
-> **Important**: If using the Key Manager companion app for API key management, install Key Manager **before** installing Cloud Speech-to-Text. Android permissions are granted at install time, and installing in the wrong order will prevent the keyboard from accessing your API keys.
-
 1. Download the APK file from [the latest release](https://github.com/happytomatoe/android-cloud-speech-to-text/releases/latest) to your phone.
 
 2. Locate the APK file in your phone and click it. Click "Install" to install the app.
