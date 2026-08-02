@@ -11,10 +11,22 @@ android {
         applicationId = "com.example.whispertoinput"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.6"
+        versionCode = 7
+        versionName = "0.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreB64 = System.getenv("KEYSTORE_BASE64")
+            if (keystoreB64 != null) {
+                storeFile = file("/tmp/release-key.jks")
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -24,6 +36,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val keystoreB64 = System.getenv("KEYSTORE_BASE64")
+            if (keystoreB64 != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             buildConfigField("boolean", "DEBUG", "true")
