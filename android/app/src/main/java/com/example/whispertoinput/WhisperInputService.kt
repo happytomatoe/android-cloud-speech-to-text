@@ -226,10 +226,13 @@ class WhisperInputService : InputMethodService() {
                     keyManagerClient?.getValidApiKeyWithRetry()
                 }
                 if (apiKey == null) {
-                    val message = if (keyManagerClient?.bind() == false) {
-                        "Key Manager app not installed"
-                    } else {
-                        "Key Manager not configured. Open Key Manager app to set credentials."
+                    val state = keyManagerClient?.getState()
+                    val message = when (state) {
+                        KeyManagerClient.ConnectionState.APP_NOT_INSTALLED -> "Key Manager app not installed"
+                        KeyManagerClient.ConnectionState.PERMISSION_MISSING -> "Key Manager installed but permission missing. Reinstall this app after Key Manager."
+                        KeyManagerClient.ConnectionState.CONNECTED -> "Key Manager not configured. Open Key Manager app to set credentials."
+                        KeyManagerClient.ConnectionState.READY -> "Key Manager app not installed"
+                        null -> "Key Manager app not installed"
                     }
                     lastTranscriptionError = message
                     Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()
