@@ -85,25 +85,6 @@
             android:minHeight="100dp"
             android:orientation="vertical" >
 
-            <!-- Debug Transcription Output (only visible in debug builds) -->
-            <TextView
-                android:id="@+id/label_debug_output"
-                style="@style/SettingsLabel"
-                android:text="Transcription Output"
-                android:visibility="gone" />
-            <EditText
-                android:id="@+id/field_debug_output"
-                style="@style/SettingsField"
-                android:layout_height="120dp"
-                android:gravity="top|start"
-                android:hint="Transcribed text will appear here..."
-                android:inputType="textMultiLine"
-                android:importantForAutofill="no"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:visibility="gone"
-                android:background="@android:drawable/edit_text" />
-
             <!-- Speech to Text Backend -->
             <TextView
                 android:id="@+id/label_speech_to_text_backend"
@@ -124,7 +105,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="@string/settings_create_api_key_label"
-                android:textColorLink="@color/link_blue"
+                android:textColor="@color/link_blue"
                 android:visibility="gone" />
 
             <!-- Endpoint -->
@@ -141,37 +122,7 @@
                 style="@style/SettingsField"
                 android:hint="@string/settings_endpoint_hint" />
 
-            <!-- API Key Source -->
-            <TextView
-                android:id="@+id/label_api_key_source"
-                style="@style/SettingsLabel"
-                android:text="@string/settings_api_key_source" />
-            <TextView
-                android:id="@+id/description_api_key_source"
-                style="@style/SettingsDescription"
-                android:text="@string/settings_api_key_source_desc" />
-            <Spinner
-                android:id="@+id/spinner_api_key_source"
-                style="@style/SettingsSpinner"
-                android:entries="@array/settings_api_key_source_array" />
-
-            <!-- Key Manager App (visible when Key Manager mode selected) -->
-            <TextView
-                android:id="@+id/label_key_manager_app"
-                style="@style/SettingsLabel"
-                android:text="@string/settings_key_manager_app"
-                android:visibility="gone" />
-            <TextView
-                android:id="@+id/description_key_manager_app"
-                style="@style/SettingsDescription"
-                android:text="@string/settings_key_manager_app_desc"
-                android:visibility="gone" />
-            <Spinner
-                android:id="@+id/spinner_key_manager_app"
-                style="@style/SettingsSpinner"
-                android:visibility="gone" />
-
-            <!-- API Key (visible when Direct mode selected) -->
+            <!-- API Key -->
             <TextView
                 android:id="@+id/label_api_key"
                 style="@style/SettingsLabel"
@@ -278,34 +229,6 @@
                 android:id="@+id/spinner_add_trailing_space"
                 style="@style/SettingsSpinner"
                 android:entries="@array/settings_add_trailing_space_array" />
-
-            <!-- Use Test File -->
-            <TextView
-                android:id="@+id/label_use_test_file"
-                style="@style/SettingsLabel"
-                android:text="@string/settings_use_test_file" />
-            <TextView
-                android:id="@+id/description_use_test_file"
-                style="@style/SettingsDescription"
-                android:text="@string/settings_use_test_file_desc" />
-            <Spinner
-                android:id="@+id/spinner_use_test_file"
-                style="@style/SettingsSpinner"
-                android:entries="@array/settings_use_test_file_array" />
-
-            <!-- Test File Path -->
-            <TextView
-                android:id="@+id/label_test_file_path"
-                style="@style/SettingsLabel"
-                android:text="@string/settings_test_file_path" />
-            <TextView
-                android:id="@+id/description_test_file_path"
-                style="@style/SettingsDescription"
-                android:text="@string/settings_test_file_path_desc" />
-            <EditText
-                android:id="@+id/field_test_file_path"
-                style="@style/SettingsField"
-                android:hint="@string/settings_test_file_path_hint" />
 
         </LinearLayout>
     </ScrollView>
