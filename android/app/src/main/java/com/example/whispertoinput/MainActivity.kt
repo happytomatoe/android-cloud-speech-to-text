@@ -26,6 +26,7 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -537,9 +538,8 @@ class MainActivity : AppCompatActivity() {
     private fun isImeEnabled(): Boolean {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         val enabledImes = imm.enabledInputMethodList
-        val imeId = "${packageName}/${WhisperInputService::class.java.canonicalName}"
-        return enabledImes.any { it.id == imeId }
-    }
+        val imeComponent = ComponentName(packageName, WhisperInputService::class.java.name)
+        return enabledImes.any { it.id == imeComponent.flattenToString() }
 
     private fun isNotificationPermissionGranted(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
