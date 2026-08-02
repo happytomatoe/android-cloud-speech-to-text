@@ -540,6 +540,7 @@ class MainActivity : AppCompatActivity() {
         val enabledImes = imm.enabledInputMethodList
         val imeComponent = ComponentName(packageName, WhisperInputService::class.java.name)
         return enabledImes.any { it.id == imeComponent.flattenToString() }
+    }
 
     private fun isNotificationPermissionGranted(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
