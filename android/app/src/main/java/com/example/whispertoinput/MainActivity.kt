@@ -33,6 +33,7 @@ import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
@@ -550,6 +551,25 @@ class MainActivity : AppCompatActivity() {
                                 val languageCodeEditText: EditText = findViewById<EditText>(R.id.field_language_code)
                                 languageCodeEditText.setText(getString(R.string.settings_option_60db_default_language))
                             }
+                            // Update Create API Key link
+                            val createKeyLink = findViewById<TextView>(R.id.link_create_api_key)
+                            val providerUrls = mapOf(
+                                getString(R.string.settings_option_openai_api) to "https://platform.openai.com/api-keys",
+                                getString(R.string.settings_option_voxtral) to "https://console.mistral.ai/?profile_dialog=api-keys",
+                                getString(R.string.settings_option_elevenlabs) to "https://elevenlabs.io/app/settings/api-keys",
+                                getString(R.string.settings_option_deepgram) to "https://console.deepgram.com/project/default/settings/api-keys",
+                                getString(R.string.settings_option_groq) to "https://console.groq.com/keys",
+                                getString(R.string.settings_option_60db) to "https://app.60db.ai/app/developers"
+                            )
+                            val url = providerUrls[selectedItem as? String]
+                            if (url != null) {
+                                createKeyLink.visibility = View.VISIBLE
+                                createKeyLink.setOnClickListener {
+                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            } else {
+                                createKeyLink.visibility = View.GONE
+                            }
                         }
                     }
                     override fun onNothingSelected(parent: AdapterView<*>) { }
@@ -565,6 +585,27 @@ class MainActivity : AppCompatActivity() {
                     spinner.adapter.getItem(it) == value
                 }
                 spinner.setSelection(index ?: 0, false)
+                // Update Create API Key link for initial selection
+                if (preferenceKey == SPEECH_TO_TEXT_BACKEND) {
+                    val createKeyLink = findViewById<TextView>(R.id.link_create_api_key)
+                    val providerUrls = mapOf(
+                        getString(R.string.settings_option_openai_api) to "https://platform.openai.com/api-keys",
+                        getString(R.string.settings_option_voxtral) to "https://console.mistral.ai/?profile_dialog=api-keys",
+                        getString(R.string.settings_option_elevenlabs) to "https://elevenlabs.io/app/settings/api-keys",
+                        getString(R.string.settings_option_deepgram) to "https://console.deepgram.com/project/default/settings/api-keys",
+                        getString(R.string.settings_option_groq) to "https://console.groq.com/keys",
+                        getString(R.string.settings_option_60db) to "https://app.60db.ai/app/developers"
+                    )
+                    val url = providerUrls[value]
+                    if (url != null) {
+                        createKeyLink.visibility = View.VISIBLE
+                        createKeyLink.setOnClickListener {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }
+                    } else {
+                        createKeyLink.visibility = View.GONE
+                    }
+                }
                 spinner.isEnabled = true
             }
         }

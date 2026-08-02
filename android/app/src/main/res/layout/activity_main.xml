@@ -117,6 +117,15 @@
                 android:id="@+id/spinner_speech_to_text_backend"
                 style="@style/SettingsSpinner"
                 android:entries="@array/settings_speech_to_text_backend_array" />
+            <TextView
+                android:id="@+id/link_create_api_key"
+                style="@style/SettingsDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/settings_create_api_key_label"
+                android:textColorLink="@color/link_blue"
+                android:visibility="gone" />
 
             <!-- Endpoint -->
             <TextView

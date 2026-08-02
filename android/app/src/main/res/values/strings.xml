@@ -30,6 +30,7 @@
     <string name="settings_btn_apply">Apply</string>
     <string name="settings_speech_to_text_backend">Speech to Text Backend</string>
     <string name="settings_speech_to_text_backend_desc">Use the official OpenAI API, Whisper ASR Webservice, NVIDIA NIM, Voxtral (Mistral), ElevenLabs Scribe, Deepgram, Groq, or 60db backend. An API key is required for OpenAI, NVIDIA NIM, Voxtral, ElevenLabs, Deepgram, Groq, and 60db.</string>
+    <string name="settings_create_api_key_label">Create API Key ↗</string>
     <string name="settings_option_openai_api">OpenAI API</string>
     <string name="settings_option_openai_api_default_endpoint">https://api.openai.com/v1/audio/transcriptions</string>
     <string name="settings_option_openai_api_default_model">whisper-1</string>
