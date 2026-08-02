@@ -62,6 +62,7 @@ val LANGUAGE_CODE = stringPreferencesKey("language-code")
 val MODEL = stringPreferencesKey("model")
 val API_KEY = stringPreferencesKey("api-key")
 val API_KEY_SOURCE = stringPreferencesKey("api-key-source")
+val KEY_MANAGER_APP = stringPreferencesKey("key-manager-app")
 val AUTO_RECORDING_START = booleanPreferencesKey("is-auto-recording-start")
 val AUTO_SWITCH_BACK = booleanPreferencesKey("auto-switch-back")
 val ADD_TRAILING_SPACE = booleanPreferencesKey("add-trailing-space")
@@ -283,7 +284,7 @@ class MainActivity : AppCompatActivity() {
                         if (!setupSettingItemsDone) return
                         isDirty = true
                         btnApply.isEnabled = true
-                        updateApiKeyVisibility(parent.getItemAtPosition(pos).toString())
+                        updateVisibility(parent.getItemAtPosition(pos).toString())
                     }
                     override fun onNothingSelected(parent: AdapterView<*>) { }
                 }
@@ -301,19 +302,24 @@ class MainActivity : AppCompatActivity() {
                 spinner.isEnabled = true
 
                 // Set initial visibility
-                updateApiKeyVisibility(value)
+                updateVisibility(value)
             }
         }
 
-        private fun updateApiKeyVisibility(selectedValue: String) {
-            val apiKeyLabel = findViewById<View>(R.id.label_api_key)
-            val apiKeyDesc = findViewById<View>(R.id.description_api_key)
-            val apiKeyField = findViewById<View>(R.id.field_api_key)
+        private fun updateVisibility(selectedValue: String) {
             val isDirect = selectedValue == DIRECT_VALUE
-            val visibility = if (isDirect) View.VISIBLE else View.GONE
-            apiKeyLabel?.visibility = visibility
-            apiKeyDesc?.visibility = visibility
-            apiKeyField?.visibility = visibility
+            val apiKeyVisibility = if (isDirect) View.VISIBLE else View.GONE
+            val keyManagerVisibility = if (isDirect) View.GONE else View.VISIBLE
+
+            // API Key fields
+            findViewById<View>(R.id.label_api_key)?.visibility = apiKeyVisibility
+            findViewById<View>(R.id.description_api_key)?.visibility = apiKeyVisibility
+            findViewById<View>(R.id.field_api_key)?.visibility = apiKeyVisibility
+
+            // Key Manager App fields
+            findViewById<View>(R.id.label_key_manager_app)?.visibility = keyManagerVisibility
+            findViewById<View>(R.id.description_key_manager_app)?.visibility = keyManagerVisibility
+            findViewById<View>(R.id.spinner_key_manager_app)?.visibility = keyManagerVisibility
         }
 
         override suspend fun apply() {
@@ -321,6 +327,92 @@ class MainActivity : AppCompatActivity() {
             val selectedItem = findViewById<Spinner>(viewId).selectedItem
             val newValue: String = selectedItem.toString()
             writeSetting(preferenceKey, newValue)
+            isDirty = false
+        }
+    }
+
+    inner class SettingKeyManagerApp(
+        private val viewId: Int,
+        private val preferenceKey: Preferences.Key<String>
+    ): SettingItem() {
+        private val discoveredPackages = mutableListOf<String>()
+
+        override fun setup(): Job {
+            return CoroutineScope(Dispatchers.Main).launch {
+                val btnApply: Button = findViewById(R.id.btn_settings_apply)
+                val spinner = findViewById<Spinner>(viewId)
+                spinner.isEnabled = false
+
+                // Discover installed key-manager apps
+                val discoveredApps = discoverKeyManagerApps()
+                discoveredPackages.clear()
+                discoveredPackages.addAll(discoveredApps.map { it.first })
+
+                // Create adapter with package names as display names
+                val adapter = android.widget.ArrayAdapter(
+                    this@MainActivity,
+                    android.R.layout.simple_spinner_item,
+                    discoveredApps.map { it.second }  // Use app names
+                )
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                spinner.adapter = adapter
+
+                spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
+                        if (!setupSettingItemsDone) return
+                        isDirty = true
+                        btnApply.isEnabled = true
+                    }
+                    override fun onNothingSelected(parent: AdapterView<*>) { }
+                }
+
+                // Read data. If none, use first discovered or default.
+                val settingValue: String? = readSetting(preferenceKey)
+                val defaultValue = if (discoveredPackages.isNotEmpty()) {
+                    discoveredPackages[0]
+                } else {
+                    getString(R.string.settings_option_key_manager_default)
+                }
+                val value: String = settingValue ?: defaultValue
+                if (settingValue == null) {
+                    writeSetting(preferenceKey, defaultValue)
+                }
+                val index: Int? = discoveredPackages.indexOf(value)
+                if (index != null && index >= 0) {
+                    spinner.setSelection(index, false)
+                }
+                spinner.isEnabled = discoveredPackages.isNotEmpty()
+
+                if (discoveredPackages.isEmpty()) {
+                    Toast.makeText(this@MainActivity, R.string.settings_key_manager_not_found, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        private fun discoverKeyManagerApps(): List<Pair<String, String>> {
+            // Query for apps that expose the key-manager service
+            val intent = Intent(KeyManagerConstants.KEY_MANAGER_ACTION)
+            val resolveInfos = packageManager.queryIntentServices(intent, 0)
+
+            return resolveInfos.mapNotNull { resolveInfo ->
+                val packageName = resolveInfo.serviceInfo.packageName
+                val appName = try {
+                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                    packageManager.getApplicationLabel(appInfo).toString()
+                } catch (e: Exception) {
+                    packageName
+                }
+                Pair(packageName, "$appName ($packageName)")
+            }
+        }
+
+        override suspend fun apply() {
+            if (!isDirty) return
+            val selectedItem = findViewById<Spinner>(viewId).selectedItemPosition
+            if (selectedItem >= 0 && selectedItem < discoveredPackages.size) {
+                val newValue = discoveredPackages[selectedItem]
+                writeSetting(preferenceKey, newValue)
+            }
             isDirty = false
         }
     }
@@ -504,6 +596,7 @@ class MainActivity : AppCompatActivity() {
                 SettingText(R.id.field_language_code, LANGUAGE_CODE, getString(R.string.settings_option_openai_api_default_language)),
                 SettingText(R.id.field_model, MODEL, getString(R.string.settings_option_openai_api_default_model)),
                 SettingApiKeySource(R.id.spinner_api_key_source, API_KEY_SOURCE),
+                SettingKeyManagerApp(R.id.spinner_key_manager_app, KEY_MANAGER_APP),
                 SettingText(R.id.field_api_key, API_KEY),
                 SettingDropdown(R.id.spinner_auto_recording_start, AUTO_RECORDING_START, hashMapOf(
                     getString(R.string.settings_option_yes) to true,

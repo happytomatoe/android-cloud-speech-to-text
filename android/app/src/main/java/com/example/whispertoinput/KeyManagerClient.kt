@@ -12,11 +12,22 @@ import com.example.keymanager.IMistralKeyManager
  * Client for communicating with Key Manager app's service.
  * Handles binding, key retrieval, and error handling.
  */
-class KeyManagerClient(private val context: Context) {
+class KeyManagerClient(private val context: Context, private var packageName: String = "com.example.keymanager") {
     private val TAG = "KeyManagerClient"
     private var service: IMistralKeyManager? = null
     private var bound = false
     private var bindAttempted = false
+
+    /**
+     * Update the target package name for binding.
+     */
+    fun setPackageName(name: String) {
+        if (bound) {
+            unbind()
+        }
+        packageName = name
+        bindAttempted = false
+    }
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
@@ -28,6 +39,7 @@ class KeyManagerClient(private val context: Context) {
         override fun onServiceDisconnected(name: ComponentName) {
             service = null
             bound = false
+            bindAttempted = false  // Allow re-binding
             Log.d(TAG, "Disconnected from Key Manager service")
         }
     }
@@ -40,8 +52,8 @@ class KeyManagerClient(private val context: Context) {
         if (bound) return true
         if (bindAttempted) return false
 
-        val intent = Intent("com.example.keymanager.MISTRAL_KEY_SERVICE")
-        intent.setPackage("com.example.keymanager")
+        val intent = Intent(KeyManagerConstants.KEY_MANAGER_ACTION)
+        intent.setPackage(packageName)
 
         return try {
             val result = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
@@ -62,6 +74,11 @@ class KeyManagerClient(private val context: Context) {
      */
     fun getValidApiKey(): String? {
         if (!bound) {
+            // Try to bind if not attempted yet
+            if (!bindAttempted) {
+                Log.d(TAG, "Not bound, attempting to bind...")
+                bind()
+            }
             Log.w(TAG, "Not bound to Key Manager service")
             return null
         }
@@ -108,4 +125,28 @@ class KeyManagerClient(private val context: Context) {
      * Check if service is currently bound.
      */
     fun isBound(): Boolean = bound
+
+    /**
+     * Get a valid API key, waiting for binding if needed.
+     * @param maxWaitMs Maximum time to wait for binding (default 2000ms)
+     * @return Valid API key, or null if unavailable
+     */
+    fun getValidApiKeyWithRetry(maxWaitMs: Long = 2000): String? {
+        // Try immediately
+        val key = getValidApiKey()
+        if (key != null) return key
+        
+        // If not bound, try to bind
+        if (!bound && !bindAttempted) {
+            bind()
+        }
+        
+        // Wait for binding with timeout
+        val startTime = System.currentTimeMillis()
+        while (!bound && (System.currentTimeMillis() - startTime) < maxWaitMs) {
+            Thread.sleep(50)
+        }
+        
+        return getValidApiKey()
+    }
 }

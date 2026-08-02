@@ -87,13 +87,17 @@
     <string name="settings_language_code_desc">The language code to be included in the request payload (e.g., en, zh).</string>
     <string name="settings_language_code_hint">Enter Language Code (e.g., en, zh)</string>
     <string name="settings_api_key_source">API Key Source</string>
-    <string name="settings_api_key_source_desc">Choose how to provide API keys. "Direct" requires entering the key in settings. "Key Manager" uses the Key Manager app for automatic key rotation.</string>
+    <string name="settings_api_key_source_desc">Choose how to provide API keys. "Direct" requires entering the key in settings. "Key Manager" uses a Key Manager app for automatic key rotation.</string>
     <string name="settings_option_api_key_direct">Direct (Enter Key)</string>
-    <string name="settings_option_api_key_key_manager">Key Manager (Recommended)</string>
+    <string name="settings_option_api_key_key_manager">Key Manager</string>
     <string-array name="settings_api_key_source_array">
         <item>@string/settings_option_api_key_key_manager</item>
         <item>@string/settings_option_api_key_direct</item>
     </string-array>
+    <string name="settings_key_manager_app">Key Manager App</string>
+    <string name="settings_key_manager_app_desc">Select which Key Manager app to use for API key management. Only apps with the correct service interface will appear.</string>
+    <string name="settings_option_key_manager_default">com.example.keymanager</string>
+    <string name="settings_key_manager_not_found">No Key Manager apps found. Install a Key Manager app or use Direct mode.</string>
     <string name="settings_api_key">API Key</string>
     <string name="settings_api_key_desc">The API key for the selected backend (required for OpenAI, NVIDIA NIM, Voxtral, ElevenLabs, Deepgram, Groq, and 60db). Only visible when API Key Source is set to "Direct".</string>
     <string name="settings_api_key_hint">Enter OpenAI API Key…</string>

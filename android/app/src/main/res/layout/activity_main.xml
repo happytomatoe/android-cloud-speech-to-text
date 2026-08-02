@@ -146,6 +146,22 @@
                 style="@style/SettingsSpinner"
                 android:entries="@array/settings_api_key_source_array" />
 
+            <!-- Key Manager App (visible when Key Manager mode selected) -->
+            <TextView
+                android:id="@+id/label_key_manager_app"
+                style="@style/SettingsLabel"
+                android:text="@string/settings_key_manager_app"
+                android:visibility="gone" />
+            <TextView
+                android:id="@+id/description_key_manager_app"
+                style="@style/SettingsDescription"
+                android:text="@string/settings_key_manager_app_desc"
+                android:visibility="gone" />
+            <Spinner
+                android:id="@+id/spinner_key_manager_app"
+                style="@style/SettingsSpinner"
+                android:visibility="gone" />
+
             <!-- API Key (visible when Direct mode selected) -->
             <TextView
                 android:id="@+id/label_api_key"

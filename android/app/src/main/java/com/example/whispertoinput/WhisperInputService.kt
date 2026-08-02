@@ -214,8 +214,16 @@ class WhisperInputService : InputMethodService() {
                 }
             } else {
                 // Key Manager mode: get API key from key-manager service
+                // Read selected key-manager app preference
+                val keyManagerApp = dataStore.data.map { preferences ->
+                    preferences[KEY_MANAGER_APP] ?: getString(R.string.settings_option_key_manager_default)
+                }.first()
+
+                // Update key-manager client with selected package
+                keyManagerClient?.setPackageName(keyManagerApp)
+
                 apiKey = withContext(Dispatchers.IO) {
-                    keyManagerClient?.getValidApiKey()
+                    keyManagerClient?.getValidApiKeyWithRetry()
                 }
                 if (apiKey == null) {
                     val message = if (keyManagerClient?.bind() == false) {

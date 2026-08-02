@@ -22,7 +22,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <queries>
-        <package android:name="com.example.keymanager" />
+        <intent>
+            <action android:name="com.whisper-to-input.KEY_MANAGER" />
+        </intent>
     </queries>
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
