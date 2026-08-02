@@ -195,23 +195,39 @@ class WhisperInputService : InputMethodService() {
 
     private fun startTranscribing(attachToEnd: String) {
         CoroutineScope(Dispatchers.Main).launch {
-            // Get valid API key from key-manager
-            val apiKey = withContext(Dispatchers.IO) {
-                keyManagerClient?.getValidApiKey()
-            }
+            // Check API key source preference
+            val apiKeySource = dataStore.data.map { preferences ->
+                preferences[API_KEY_SOURCE] ?: getString(R.string.settings_option_api_key_key_manager)
+            }.first()
 
-            if (apiKey == null) {
-                // Key-manager not available or not configured
-                val message = if (keyManagerClient?.bind() == false) {
-                    "Key Manager app not installed"
-                } else {
-                    "Key Manager not configured. Open Key Manager app to set credentials."
+            val apiKey: String?
+            if (apiKeySource == getString(R.string.settings_option_api_key_direct)) {
+                // Direct mode: read API key from settings
+                apiKey = dataStore.data.map { preferences ->
+                    preferences[API_KEY] ?: ""
+                }.first()
+                if (apiKey.isNullOrEmpty()) {
+                    lastTranscriptionError = "API Key is not set. Open Settings to enter your API key."
+                    Toast.makeText(this@WhisperInputService, lastTranscriptionError, Toast.LENGTH_LONG).show()
+                    whisperKeyboard.reset()
+                    return@launch
                 }
-                
-                lastTranscriptionError = message
-                Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()
-                whisperKeyboard.reset()
-                return@launch
+            } else {
+                // Key Manager mode: get API key from key-manager service
+                apiKey = withContext(Dispatchers.IO) {
+                    keyManagerClient?.getValidApiKey()
+                }
+                if (apiKey == null) {
+                    val message = if (keyManagerClient?.bind() == false) {
+                        "Key Manager app not installed"
+                    } else {
+                        "Key Manager not configured. Open Key Manager app to set credentials."
+                    }
+                    lastTranscriptionError = message
+                    Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()
+                    whisperKeyboard.reset()
+                    return@launch
+                }
             }
 
             val useTestFile = if (BuildConfig.DEBUG) {

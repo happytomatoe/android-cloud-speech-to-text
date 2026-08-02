@@ -60,6 +60,8 @@ val SPEECH_TO_TEXT_BACKEND = stringPreferencesKey("speech-to-text-backend")
 val ENDPOINT = stringPreferencesKey("endpoint")
 val LANGUAGE_CODE = stringPreferencesKey("language-code")
 val MODEL = stringPreferencesKey("model")
+val API_KEY = stringPreferencesKey("api-key")
+val API_KEY_SOURCE = stringPreferencesKey("api-key-source")
 val AUTO_RECORDING_START = booleanPreferencesKey("is-auto-recording-start")
 val AUTO_SWITCH_BACK = booleanPreferencesKey("auto-switch-back")
 val ADD_TRAILING_SPACE = booleanPreferencesKey("add-trailing-space")
@@ -264,6 +266,65 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    inner class SettingApiKeySource(
+        private val viewId: Int,
+        private val preferenceKey: Preferences.Key<String>
+    ): SettingItem() {
+        private val KEY_MANAGER_VALUE = getString(R.string.settings_option_api_key_key_manager)
+        private val DIRECT_VALUE = getString(R.string.settings_option_api_key_direct)
+
+        override fun setup(): Job {
+            return CoroutineScope(Dispatchers.Main).launch {
+                val btnApply: Button = findViewById(R.id.btn_settings_apply)
+                val spinner = findViewById<Spinner>(viewId)
+                spinner.isEnabled = false
+                spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
+                        if (!setupSettingItemsDone) return
+                        isDirty = true
+                        btnApply.isEnabled = true
+                        updateApiKeyVisibility(parent.getItemAtPosition(pos).toString())
+                    }
+                    override fun onNothingSelected(parent: AdapterView<*>) { }
+                }
+
+                // Read data. If none, apply default value.
+                val settingValue: String? = readSetting(preferenceKey)
+                val value: String = settingValue ?: KEY_MANAGER_VALUE
+                if (settingValue == null) {
+                    writeSetting(preferenceKey, KEY_MANAGER_VALUE)
+                }
+                val index: Int? = (0 until spinner.adapter.count).firstOrNull {
+                    spinner.adapter.getItem(it) == value
+                }
+                spinner.setSelection(index ?: 0, false)
+                spinner.isEnabled = true
+
+                // Set initial visibility
+                updateApiKeyVisibility(value)
+            }
+        }
+
+        private fun updateApiKeyVisibility(selectedValue: String) {
+            val apiKeyLabel = findViewById<View>(R.id.label_api_key)
+            val apiKeyDesc = findViewById<View>(R.id.description_api_key)
+            val apiKeyField = findViewById<View>(R.id.field_api_key)
+            val isDirect = selectedValue == DIRECT_VALUE
+            val visibility = if (isDirect) View.VISIBLE else View.GONE
+            apiKeyLabel?.visibility = visibility
+            apiKeyDesc?.visibility = visibility
+            apiKeyField?.visibility = visibility
+        }
+
+        override suspend fun apply() {
+            if (!isDirty) return
+            val selectedItem = findViewById<Spinner>(viewId).selectedItem
+            val newValue: String = selectedItem.toString()
+            writeSetting(preferenceKey, newValue)
+            isDirty = false
+        }
+    }
+
     inner class SettingStringDropdown(
         private val viewId: Int,
         private val preferenceKey: Preferences.Key<String>,
@@ -442,6 +503,8 @@ class MainActivity : AppCompatActivity() {
                 SettingText(R.id.field_endpoint, ENDPOINT, getString(R.string.settings_option_openai_api_default_endpoint)),
                 SettingText(R.id.field_language_code, LANGUAGE_CODE, getString(R.string.settings_option_openai_api_default_language)),
                 SettingText(R.id.field_model, MODEL, getString(R.string.settings_option_openai_api_default_model)),
+                SettingApiKeySource(R.id.spinner_api_key_source, API_KEY_SOURCE),
+                SettingText(R.id.field_api_key, API_KEY),
                 SettingDropdown(R.id.spinner_auto_recording_start, AUTO_RECORDING_START, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
