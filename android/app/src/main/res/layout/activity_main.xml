@@ -136,6 +136,34 @@
                 style="@style/SettingsField"
                 android:hint="@string/settings_api_key_hint" />
 
+            <!-- API Key Source -->
+            <TextView
+                android:id="@+id/label_api_key_source"
+                style="@style/SettingsLabel"
+                android:text="@string/settings_api_key_source" />
+            <TextView
+                android:id="@+id/description_api_key_source"
+                style="@style/SettingsDescription"
+                android:text="@string/settings_api_key_source_desc" />
+            <Spinner
+                android:id="@+id/spinner_api_key_source"
+                style="@style/SettingsSpinner"
+                android:entries="@array/settings_api_key_source_array" />
+
+            <!-- Key Manager App -->
+            <TextView
+                android:id="@+id/label_key_manager_app"
+                style="@style/SettingsLabel"
+                android:text="@string/settings_key_manager_app" />
+            <TextView
+                android:id="@+id/description_key_manager_app"
+                style="@style/SettingsDescription"
+                android:text="@string/settings_key_manager_app_desc" />
+            <Spinner
+                android:id="@+id/spinner_key_manager_app"
+                style="@style/SettingsSpinner"
+                android:entries="@array/settings_key_manager_app_array" />
+
             <TextView
                 android:id="@+id/link_elevenlabs_api_key"
                 style="@style/SettingsDescription"

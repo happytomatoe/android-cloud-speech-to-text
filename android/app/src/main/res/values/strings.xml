@@ -92,8 +92,11 @@
     <string name="settings_option_api_key_direct">Direct (Enter Key)</string>
     <string name="settings_option_api_key_key_manager">Key Manager</string>
     <string-array name="settings_api_key_source_array">
-        <item>@string/settings_option_api_key_key_manager</item>
         <item>@string/settings_option_api_key_direct</item>
+        <item>@string/settings_option_api_key_key_manager</item>
+    </string-array>
+    <string-array name="settings_key_manager_app_array">
+        <item>com.example.keymanager</item>
     </string-array>
     <string name="settings_key_manager_app">Key Manager App</string>
     <string name="settings_key_manager_app_desc">Select which Key Manager app to use for API key management. Only apps with the correct service interface will appear.</string>

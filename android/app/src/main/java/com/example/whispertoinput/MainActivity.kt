@@ -482,6 +482,13 @@ class MainActivity : AppCompatActivity() {
                     getString(R.string.settings_option_to_simplified),
                     getString(R.string.settings_option_no_conversion)
                 ), getString(R.string.settings_option_to_traditional)),
+                SettingStringDropdown(R.id.spinner_api_key_source, API_KEY_SOURCE, listOf(
+                    getString(R.string.settings_option_api_key_direct),
+                    getString(R.string.settings_option_api_key_key_manager)
+                ), getString(R.string.settings_option_api_key_direct)),
+                SettingStringDropdown(R.id.spinner_key_manager_app, KEY_MANAGER_APP, listOf(
+                    getString(R.string.settings_option_key_manager_default)
+                ), getString(R.string.settings_option_key_manager_default)),
             )
             val btnApply: Button = findViewById(R.id.btn_settings_apply)
             btnApply.isEnabled = false

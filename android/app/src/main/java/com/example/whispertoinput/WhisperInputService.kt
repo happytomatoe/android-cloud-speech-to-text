@@ -197,7 +197,7 @@ class WhisperInputService : InputMethodService() {
         CoroutineScope(Dispatchers.Main).launch {
             // Check API key source preference
             val apiKeySource = dataStore.data.map { preferences ->
-                preferences[API_KEY_SOURCE] ?: getString(R.string.settings_option_api_key_key_manager)
+                preferences[API_KEY_SOURCE] ?: getString(R.string.settings_option_api_key_direct)
             }.first()
 
             val apiKey: String?
