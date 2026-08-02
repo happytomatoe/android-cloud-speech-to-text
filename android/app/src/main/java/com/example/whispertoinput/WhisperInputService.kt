@@ -117,10 +117,10 @@ class WhisperInputService : InputMethodService() {
 
     private suspend fun updateAudioFormat() {
         val backend = dataStore.data.map { preferences: Preferences ->
-            preferences[SPEECH_TO_TEXT_BACKEND] ?: getString(R.string.settings_option_openai_api)
+            preferences[SPEECH_TO_TEXT_BACKEND] ?: getString(R.string.settings_option_voxtral)
         }.first()
 
-        useOggFormat = backend == getString(R.string.settings_option_nvidia_nim)
+        useOggFormat = false
         if (useOggFormat) {
             recordedAudioFilename = "${externalCacheDir?.absolutePath}/${RECORDED_AUDIO_FILENAME_OGG}"
             audioMediaType = AUDIO_MEDIA_TYPE_OGG
