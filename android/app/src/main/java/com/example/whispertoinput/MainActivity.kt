@@ -23,6 +23,8 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.core.app.ActivityCompat
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -56,6 +58,7 @@ import kotlinx.coroutines.launch
 // 200 and 201 are an arbitrary values, as long as they do not conflict with each other
 private const val MICROPHONE_PERMISSION_REQUEST_CODE = 200
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 201
+const val NOTIFICATION_CHANNEL_ID = "whisper_to_input_channel"
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 val SPEECH_TO_TEXT_BACKEND = stringPreferencesKey("speech-to-text-backend")
 val ENDPOINT = stringPreferencesKey("endpoint")
@@ -79,6 +82,21 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setupSettingItems()
         checkPermissions()
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.notification_channel_description)
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
     }
 
     override fun onResume() {
@@ -414,8 +432,8 @@ class MainActivity : AppCompatActivity() {
                                 .setTitle(R.string.notification_enable_dialog_title)
                                 .setMessage(R.string.notification_enable_dialog_message)
                                 .setPositiveButton(R.string.notification_enable_dialog_enable) { _, _ ->
-                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    intent.data = Uri.fromParts("package", packageName, null)
+                                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                                     startActivity(intent)
                                 }
                                 .setNegativeButton(R.string.ime_enable_dialog_later, null)

@@ -28,6 +28,8 @@ On Samsung: Settings → General management → Keyboard list and default → to
     <string name="ime_enable_dialog_enable">Enable</string>
     <string name="ime_enable_dialog_later">Later</string>
     <string name="ime_enabled_success">Cloud Speech-to-Text keyboard enabled successfully!</string>
+    <string name="notification_channel_name">Cloud Speech-to-Text Notifications</string>
+    <string name="notification_channel_description">Error messages and status updates from Cloud Speech-to-Text</string>
 
     <string name="notification_enable_dialog_title">Enable Notifications</string>
     <string name="notification_enable_dialog_message">To receive error messages and status updates from Cloud Speech-to-Text, please enable notifications for this app in your device settings.</string>
