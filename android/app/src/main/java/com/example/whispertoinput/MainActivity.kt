@@ -92,7 +92,7 @@ class MainActivity : AppCompatActivity() {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
                 getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = getString(R.string.notification_channel_description)
             }
@@ -109,6 +109,27 @@ class MainActivity : AppCompatActivity() {
         }
         openedImeSettings = false
         wasImeEnabledBeforeSettings = false
+
+        // Check if notifications are blocked and guide user to Settings
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+                showNotificationsBlockedDialog()
+            }
+        }
+    }
+
+    private fun showNotificationsBlockedDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notification_permission_required))
+            .setMessage("Notifications are required for this app to work. Please enable them in Settings.")
+            .setPositiveButton("Open Settings") { _, _ ->
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                }
+                startActivity(intent)
+            }
+            .setNegativeButton("Not now", null)
+            .show()
     }
 
     // The onClick event of the grant permission button.
