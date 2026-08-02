@@ -25,11 +25,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.view.View
-import android.widget.ImageButton
-import android.widget.TextView
 import android.widget.Toast
 import androidx.datastore.preferences.core.Preferences
 import com.example.whispertoinput.recorder.RecorderManager
+import com.example.whispertoinput.keyboard.WhisperKeyboard
 import com.github.liuyueyi.quick.transfer.ChineseUtils
 import com.github.liuyueyi.quick.transfer.constants.TransType
 import kotlinx.coroutines.CoroutineScope
@@ -57,15 +56,15 @@ class WhisperInputService : InputMethodService() {
     private var useOggFormat: Boolean = false
     private var testFileModeRecording: Boolean = false  // Track test file recording state
 
-    // UI elements
-    private var micButton: ImageButton? = null
-    private var statusLabel: TextView? = null
+    // Keyboard
+    private val whisperKeyboard = WhisperKeyboard()
 
     private val toggleReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             android.util.Log.d("whisper-input", "onReceive: action=${intent?.action}")
             if (intent?.action == ACTION_TOGGLE_RECORDING) {
-                toggleRecording()
+                // External toggle: start recording if idle (user taps mic to stop/transcribe)
+                whisperKeyboard.tryStartRecording()
             }
         }
     }
@@ -91,14 +90,15 @@ class WhisperInputService : InputMethodService() {
                 }
             }
         }
-        updateMicUI(false)
+        whisperKeyboard.reset()
     }
 
     private fun transcriptionExceptionCallback(message: String) {
         // Store error for display in MainActivity debug field
         lastTranscriptionError = message
+        android.util.Log.e("whisper-input", "Transcription error: $message")
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        updateMicUI(false)
+        whisperKeyboard.reset()
     }
 
     companion object {
@@ -124,14 +124,6 @@ class WhisperInputService : InputMethodService() {
 
     override fun onCreateInputView(): View {
         android.util.Log.d("whisper-input", "onCreateInputView: creating keyboard view")
-        val view = layoutInflater.inflate(R.layout.keyboard_view, null)
-
-        micButton = view.findViewById(R.id.btn_mic)
-        statusLabel = view.findViewById(R.id.label_status)
-
-        micButton?.setOnClickListener {
-            toggleRecording()
-        }
 
         // Preload conversion table
         ChineseUtils.preLoad(true, TransType.SIMPLE_TO_TAIWAN)
@@ -141,70 +133,75 @@ class WhisperInputService : InputMethodService() {
             updateAudioFormat()
         }
 
+        val view = whisperKeyboard.setup(
+            layoutInflater = layoutInflater,
+            shouldOfferImeSwitch = true,
+            onStartRecording = { startRecording() },
+            onCancelRecording = { cancelRecording() },
+            onStartTranscribing = { attachToEnd -> startTranscribing(attachToEnd) },
+            onCancelTranscribing = { cancelTranscribing() },
+            onButtonBackspace = { performBackspace() },
+            onEnter = { performEnter() },
+            onSpaceBar = { performSpace() },
+            onSwitchIme = { switchToPreviousInputMethod() },
+            onOpenSettings = { launchMainActivity() },
+            shouldShowRetry = { lastTranscriptionError != null }
+        )
+
         android.util.Log.d("whisper-input", "onCreateInputView: keyboard view created")
         return view
     }
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // Don't auto-start — wait for mic button tap
+        // Auto-start recording when keyboard appears
+        whisperKeyboard.tryStartRecording()
     }
 
-    private fun toggleRecording() {
+    private fun startRecording() {
         if (!recorderManager.allPermissionsGranted(this)) {
             launchMainActivity()
             return
         }
 
-        // Launch coroutine to handle toggle logic (includes async DataStore reads)
         CoroutineScope(Dispatchers.Main).launch {
-            // Check if test file mode is enabled (debug builds only)
             val useTestFile = if (BuildConfig.DEBUG) {
-                dataStore.data
-                    .map { it[USE_TEST_FILE] ?: false }
-                    .first()
+                dataStore.data.map { it[USE_TEST_FILE] ?: false }.first()
             } else false
 
             if (useTestFile) {
-                // Test file mode: use testFileModeRecording flag
-                if (testFileModeRecording) {
-                    // Stop test file recording and transcribe
-                    testFileModeRecording = false
-                    updateMicUI(false)
-                    statusLabel?.text = getString(R.string.transcribing)
+                testFileModeRecording = true
+            } else {
+                updateAudioFormat()
+                recorderManager.start(this@WhisperInputService, recordedAudioFilename, useOggFormat)
+            }
+        }
+    }
 
-                    val testFilePath = dataStore.data
-                        .map { it[TEST_FILE_PATH] ?: "/sdcard/test-speech-loud.wav" }
-                        .first()
+    private fun cancelRecording() {
+        if (recorderManager.isRecording) {
+            recorderManager.stop()
+        }
+        testFileModeRecording = false
+    }
 
-                    whisperTranscriber.startAsync(this@WhisperInputService,
-                        testFilePath,
-                        AUDIO_MEDIA_TYPE_WAV,
-                        "",
-                        { text ->
-                            android.util.Log.d("whisper-input", "Transcription result: '$text'")
-                            transcriptionCallback(text)
-                        },
-                        { msg ->
-                            android.util.Log.e("whisper-input", "Transcription error: $msg")
-                            transcriptionExceptionCallback(msg)
-                        })
-                } else {
-                    // Start test file recording (just update UI)
-                    testFileModeRecording = true
-                    updateMicUI(true)
-                    statusLabel?.text = getString(R.string.recording)
-                }
-            } else if (recorderManager.isRecording) {
-                // Normal mode: stop recording and transcribe
-                recorderManager.stop()
-                updateMicUI(false)
-                statusLabel?.text = getString(R.string.transcribing)
+    private fun startTranscribing(attachToEnd: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            val useTestFile = if (BuildConfig.DEBUG) {
+                dataStore.data.map { it[USE_TEST_FILE] ?: false }.first()
+            } else false
+
+            if (useTestFile) {
+                // Test file mode: stop recording and transcribe test file
+                testFileModeRecording = false
+                val testFilePath = dataStore.data
+                    .map { it[TEST_FILE_PATH] ?: "/sdcard/test-speech-loud.wav" }
+                    .first()
 
                 whisperTranscriber.startAsync(this@WhisperInputService,
-                    recordedAudioFilename,
-                    audioMediaType,
-                    "",
+                    testFilePath,
+                    AUDIO_MEDIA_TYPE_WAV,
+                    attachToEnd,
                     { text ->
                         android.util.Log.d("whisper-input", "Transcription result: '$text'")
                         transcriptionCallback(text)
@@ -213,24 +210,40 @@ class WhisperInputService : InputMethodService() {
                         android.util.Log.e("whisper-input", "Transcription error: $msg")
                         transcriptionExceptionCallback(msg)
                     })
-            } else {
-                // Normal mode: start recording
-                updateAudioFormat()
-                recorderManager.start(this@WhisperInputService, recordedAudioFilename, useOggFormat)
-                updateMicUI(true)
-                statusLabel?.text = getString(R.string.recording)
+            } else if (recorderManager.isRecording) {
+                // Normal mode: stop recording and transcribe
+                recorderManager.stop()
+
+                whisperTranscriber.startAsync(this@WhisperInputService,
+                    recordedAudioFilename,
+                    audioMediaType,
+                    attachToEnd,
+                    { text ->
+                        android.util.Log.d("whisper-input", "Transcription result: '$text'")
+                        transcriptionCallback(text)
+                    },
+                    { msg ->
+                        android.util.Log.e("whisper-input", "Transcription error: $msg")
+                        transcriptionExceptionCallback(msg)
+                    })
             }
         }
     }
 
-    private fun updateMicUI(isRecording: Boolean) {
-        if (isRecording) {
-            micButton?.setImageResource(R.drawable.mic_pressed)
-            statusLabel?.text = getString(R.string.recording)
-        } else {
-            micButton?.setImageResource(R.drawable.mic_idle)
-            statusLabel?.text = getString(R.string.whisper_to_input)
-        }
+    private fun cancelTranscribing() {
+        whisperTranscriber.stop()
+    }
+
+    private fun performBackspace() {
+        currentInputConnection?.deleteSurroundingText(1, 0)
+    }
+
+    private fun performEnter() {
+        currentInputConnection?.commitText("\n", 1)
+    }
+
+    private fun performSpace() {
+        currentInputConnection?.commitText(" ", 1)
     }
 
     private fun launchMainActivity() {
@@ -244,8 +257,8 @@ class WhisperInputService : InputMethodService() {
         android.util.Log.d("whisper-input", "onWindowHidden: isRecording=${recorderManager.isRecording}")
         if (recorderManager.isRecording) {
             recorderManager.stop()
-            updateMicUI(false)
         }
+        whisperKeyboard.reset()
     }
 
     override fun onDestroy() {

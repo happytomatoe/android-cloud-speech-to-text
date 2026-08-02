@@ -3,3 +3,7 @@
 test-sources/*.wav
 test-sources/*.mp3
 test-sources/*.ogg
+
+# Rotated API keys
+*.env
+.whisper-to-input.env
