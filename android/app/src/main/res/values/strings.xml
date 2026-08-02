@@ -21,6 +21,13 @@
     <string name="btn_previous_ime_hint">Switch To Previous Input Method</string>
     <string name="generate_logcat">Generate Recent Logcat</string>
 
+    <string name="ime_enable_dialog_title">Enable Whisper Input</string>
+    <string name="ime_enable_dialog_message">Settings saved! To use voice input, enable "Whisper Input" in your keyboard settings.
+
+On Samsung: Settings → General management → Keyboard list and default → toggle "Whisper Input" ON.</string>
+    <string name="ime_enable_dialog_enable">Enable</string>
+    <string name="ime_enable_dialog_later">Later</string>
+
     <!-- Warning and Error Messages -->
     <string name="error_endpoint_unset">Error: Endpoint is not set in settings.</string>
     <string name="error_apikey_unset">Error: API Key is not set in settings.</string>

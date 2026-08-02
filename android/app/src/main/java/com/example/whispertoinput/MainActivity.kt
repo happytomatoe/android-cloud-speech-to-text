@@ -35,6 +35,7 @@ import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import android.view.inputmethod.InputMethodManager
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
 import androidx.datastore.core.DataStore
@@ -501,9 +502,26 @@ class MainActivity : AppCompatActivity() {
                     btnApply.isEnabled = false
                 }
                 Toast.makeText(this@MainActivity, R.string.successfully_set, Toast.LENGTH_SHORT).show()
+                if (!isImeEnabled()) {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle(R.string.ime_enable_dialog_title)
+                        .setMessage(R.string.ime_enable_dialog_message)
+                        .setPositiveButton(R.string.ime_enable_dialog_enable) { _, _ ->
+                            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                        }
+                        .setNegativeButton(R.string.ime_enable_dialog_later, null)
+                        .show()
+                }
             }
             settingItems.map { settingItem -> settingItem.setup() }.joinAll()
             setupSettingItemsDone = true
         }
     }
-}
+
+    private fun isImeEnabled(): Boolean {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        val enabledImes = imm.enabledInputMethodList
+        val imeId = "${packageName}/${WhisperInputService::class.java.canonicalName}"
+        return enabledImes.any { it.id == imeId }
+    }
+    }
