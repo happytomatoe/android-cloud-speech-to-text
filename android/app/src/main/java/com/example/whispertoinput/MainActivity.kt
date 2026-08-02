@@ -542,6 +542,7 @@ class MainActivity : AppCompatActivity() {
         val imeShort = imeComponent.flattenToShortString()
         val imeLong = imeComponent.flattenToString()
         return enabledImes.any { it.id == imeShort || it.id == imeLong }
+    }
 
     private fun isNotificationPermissionGranted(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
