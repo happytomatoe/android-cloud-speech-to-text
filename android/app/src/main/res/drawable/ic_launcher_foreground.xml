@@ -28,4 +28,28 @@
         android:strokeWidth="4"
         android:pathData="M40.3,85.7 L60.5,85.7"
         android:strokeLineCap="round"/>
+    <!-- Sound wave 1 (closest) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.8"
+        android:pathData="M72,38 Q78,50 72,62"
+        android:strokeLineCap="round"/>
+    <!-- Sound wave 2 (middle) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.6"
+        android:pathData="M80,32 Q88,50 80,68"
+        android:strokeLineCap="round"/>
+    <!-- Sound wave 3 (farthest) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.4"
+        android:pathData="M88,26 Q98,50 88,74"
+        android:strokeLineCap="round"/>
 </vector>
