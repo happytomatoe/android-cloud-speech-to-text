@@ -1,1 +1,3 @@
-- We lost instructions on how to change the input method from the UI.
+# TODO
+
+- [x] ~~Currently the method that should detect that we changed the input method doesn't work. So basically when I press apply multiple times and I already enabled the new keyboard I'm still getting the alert dialog to do that again.~~ (Fixed in v0.9.2 - added onResume() to detect IME state)

@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.IBinder
 import android.util.Log
 import com.example.keymanager.IMistralKeyManager
@@ -17,6 +18,7 @@ class KeyManagerClient(private val context: Context, private var packageName: St
     private var service: IMistralKeyManager? = null
     private var bound = false
     private var bindAttempted = false
+    private val permissionName = "com.example.keymanager.BIND_KEY_SERVICE"
 
     /**
      * Update the target package name for binding.
@@ -125,6 +127,45 @@ class KeyManagerClient(private val context: Context, private var packageName: St
      * Check if service is currently bound.
      */
     fun isBound(): Boolean = bound
+
+    /**
+     * Check if the key-manager app is installed.
+     * @return true if app is installed
+     */
+    fun isAppInstalled(): Boolean {
+        val intent = Intent(KeyManagerConstants.KEY_MANAGER_ACTION)
+        intent.setPackage(packageName)
+        val resolveInfos = context.packageManager.queryIntentServices(intent, PackageManager.GET_RESOLVED_FILTER)
+        return resolveInfos.isNotEmpty()
+    }
+
+    /**
+     * Check if the permission required to bind to key-manager is granted.
+     * @return true if permission is granted
+     */
+    fun hasPermission(): Boolean {
+        return context.checkPermission(permissionName, android.os.Process.myPid(), android.os.Process.myUid()) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Get the current connection state as a descriptive enum.
+     */
+    fun getState(): ConnectionState {
+        if (bound) return ConnectionState.CONNECTED
+        if (!isAppInstalled()) return ConnectionState.APP_NOT_INSTALLED
+        if (!hasPermission()) return ConnectionState.PERMISSION_MISSING
+        return ConnectionState.READY
+    }
+
+    /**
+     * Possible connection states for better error reporting.
+     */
+    enum class ConnectionState {
+        READY,           // App installed and permission granted, ready to bind
+        CONNECTED,       // Currently bound to service
+        APP_NOT_INSTALLED, // Key Manager app not found on device
+        PERMISSION_MISSING // App installed but permission not granted (wrong install order)
+    }
 
     /**
      * Get a valid API key, waiting for binding if needed.

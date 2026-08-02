@@ -117,10 +117,10 @@ class WhisperInputService : InputMethodService() {
 
     private suspend fun updateAudioFormat() {
         val backend = dataStore.data.map { preferences: Preferences ->
-            preferences[SPEECH_TO_TEXT_BACKEND] ?: getString(R.string.settings_option_openai_api)
+            preferences[SPEECH_TO_TEXT_BACKEND] ?: getString(R.string.settings_option_voxtral)
         }.first()
 
-        useOggFormat = backend == getString(R.string.settings_option_nvidia_nim)
+        useOggFormat = false
         if (useOggFormat) {
             recordedAudioFilename = "${externalCacheDir?.absolutePath}/${RECORDED_AUDIO_FILENAME_OGG}"
             audioMediaType = AUDIO_MEDIA_TYPE_OGG
@@ -226,10 +226,13 @@ class WhisperInputService : InputMethodService() {
                     keyManagerClient?.getValidApiKeyWithRetry()
                 }
                 if (apiKey == null) {
-                    val message = if (keyManagerClient?.bind() == false) {
-                        "Key Manager app not installed"
-                    } else {
-                        "Key Manager not configured. Open Key Manager app to set credentials."
+                    val state = keyManagerClient?.getState()
+                    val message = when (state) {
+                        KeyManagerClient.ConnectionState.APP_NOT_INSTALLED -> "Key Manager app not installed"
+                        KeyManagerClient.ConnectionState.PERMISSION_MISSING -> "Key Manager installed but permission missing. Reinstall this app after Key Manager."
+                        KeyManagerClient.ConnectionState.CONNECTED -> "Key Manager not configured. Open Key Manager app to set credentials."
+                        KeyManagerClient.ConnectionState.READY -> "Key Manager service is not connected. Try again."
+                        null -> "Key Manager is unavailable. Open Key Manager and try again."
                     }
                     lastTranscriptionError = message
                     Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()

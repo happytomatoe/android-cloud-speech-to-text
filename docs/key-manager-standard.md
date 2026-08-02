@@ -123,3 +123,24 @@ adb logcat -s KeyManagerClient
 - The AIDL interface must match exactly (same package, same method signatures)
 - API keys should be rotated automatically by your key-manager app
 - whisper-to-input caches keys for 5 minutes (configurable in key-manager)
+
+## Installation Order
+
+**Important:** Install the key-manager app BEFORE installing whisper-to-input.
+
+Android permissions are granted at install time. If whisper-to-input is installed first, the `com.example.keymanager.BIND_KEY_SERVICE` permission will not exist yet, and Android silently ignores the permission request. The permission is never retroactively granted when the key-manager app is installed later.
+
+### Correct Order
+1. Install key-manager app first
+2. Install whisper-to-input second
+
+### If Installed in Wrong Order
+If whisper-to-input was installed before key-manager, you must reinstall whisper-to-input after installing key-manager. This triggers Android to re-evaluate permissions.
+
+### Detection
+whisper-to-input detects this issue and shows "Key Manager app not installed" error. Check logs with:
+```bash
+adb logcat -s KeyManagerClient
+```
+
+The `hasPermission()` method can also be used programmatically to check if the binding permission is granted.
