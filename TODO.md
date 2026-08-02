@@ -1,0 +1,1 @@
+- We lost instructions on how to change the input method from the UI.

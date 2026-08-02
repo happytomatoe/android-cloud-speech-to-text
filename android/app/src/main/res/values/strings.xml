@@ -1,9 +1,9 @@
 <resources>
     <!-- General -->
-    <string name="app_name">Fedora STT</string>
+    <string name="app_name">Cloud Speech-to-Text</string>
     <string name="enter_text">Enter Text</string>
-    <string name="whisper_to_input">Fedora STT</string>
-    <string name="voice_input_label">Fedora STT Voice Input</string>
+    <string name="whisper_to_input">Cloud Speech-to-Text</string>
+    <string name="voice_input_label">Cloud Speech-to-Text Voice Input</string>
     <string name="empty_string" />
     <string name="loading">Loading…</string>
 
@@ -13,23 +13,23 @@
     <string name="start_speech_to_text">Start speech-to-text.</string>
     <string name="start_transcribing">Start transcribing.</string>
     <string name="grant_microphone_permission">Grant Microphone Permission</string>
-    <string name="mic_permission_required">Fedora STT requires microphone permission to work.</string>
-    <string name="notification_permission_required">Fedora STT requires notification permission to work.</string>
+    <string name="mic_permission_required">Cloud Speech-to-Text requires microphone permission to work.</string>
+    <string name="notification_permission_required">Cloud Speech-to-Text requires notification permission to work.</string>
     <string name="microphone">Microphone</string>
     <string name="successfully_set">Successfully set!</string>
     <string name="backspace_button_hint">Backspace Button</string>
     <string name="btn_previous_ime_hint">Switch To Previous Input Method</string>
     <string name="generate_logcat">Generate Recent Logcat</string>
 
-    <string name="ime_enable_dialog_title">Enable Fedora STT</string>
-    <string name="ime_enable_dialog_message">Settings saved! To use voice input, enable "Fedora STT" in your keyboard settings.
+    <string name="ime_enable_dialog_title">Enable Cloud Speech-to-Text</string>
+    <string name="ime_enable_dialog_message">Settings saved! To use voice input, enable "Cloud Speech-to-Text" in your keyboard settings.
 
-On Samsung: Settings → General management → Keyboard list and default → toggle "Fedora STT" ON.</string>
+On Samsung: Settings → General management → Keyboard list and default → toggle "Cloud Speech-to-Text" ON.</string>
     <string name="ime_enable_dialog_enable">Enable</string>
     <string name="ime_enable_dialog_later">Later</string>
 
     <string name="notification_enable_dialog_title">Enable Notifications</string>
-    <string name="notification_enable_dialog_message">To receive error messages and status updates from Fedora STT, please enable notifications for this app in your device settings.</string>
+    <string name="notification_enable_dialog_message">To receive error messages and status updates from Cloud Speech-to-Text, please enable notifications for this app in your device settings.</string>
     <string name="notification_enable_dialog_enable">Enable</string>
 
     <!-- Warning and Error Messages -->
@@ -37,7 +37,7 @@ On Samsung: Settings → General management → Keyboard list and default → to
     <string name="error_apikey_unset">Error: API Key is not set in settings.</string>
 
     <!-- Settings -->
-    <string name="whisper_to_input_settings_title">Fedora STT Settings</string>
+    <string name="whisper_to_input_settings_title">Cloud Speech-to-Text Settings</string>
     <string name="settings_btn_apply">Apply</string>
     <string name="settings_speech_to_text_backend">Speech to Text Backend</string>
     <string name="settings_speech_to_text_backend_desc">Use the official OpenAI API, Whisper ASR Webservice, NVIDIA NIM, Voxtral (Mistral), ElevenLabs Scribe, Deepgram, Groq, or 60db backend. An API key is required for OpenAI, NVIDIA NIM, Voxtral, ElevenLabs, Deepgram, Groq, and 60db.</string>

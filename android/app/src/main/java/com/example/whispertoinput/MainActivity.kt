@@ -36,6 +36,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import android.view.inputmethod.InputMethodManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
 import androidx.datastore.core.DataStore
@@ -399,6 +400,19 @@ class MainActivity : AppCompatActivity() {
                                 createKeyLink.visibility = View.GONE
                             }
                         }
+                        // Prompt for notification permission after changing backend
+                        if (!isNotificationPermissionGranted()) {
+                            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                                .setTitle(R.string.notification_enable_dialog_title)
+                                .setMessage(R.string.notification_enable_dialog_message)
+                                .setPositiveButton(R.string.notification_enable_dialog_enable) { _, _ ->
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                    intent.data = Uri.fromParts("package", packageName, null)
+                                    startActivity(intent)
+                                }
+                                .setNegativeButton(R.string.ime_enable_dialog_later, null)
+                                .show()
+                        }
                     }
                     override fun onNothingSelected(parent: AdapterView<*>) { }
                 }
@@ -473,16 +487,11 @@ class MainActivity : AppCompatActivity() {
                 SettingDropdown(R.id.spinner_auto_switch_back, AUTO_SWITCH_BACK, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
-                ), false),
+                ), true),
                 SettingDropdown(R.id.spinner_add_trailing_space, ADD_TRAILING_SPACE, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
                 ), false),
-                SettingStringDropdown(R.id.spinner_postprocessing, POSTPROCESSING, listOf(
-                    getString(R.string.settings_option_to_traditional),
-                    getString(R.string.settings_option_to_simplified),
-                    getString(R.string.settings_option_no_conversion)
-                ), getString(R.string.settings_option_to_traditional)),
                 SettingStringDropdown(R.id.spinner_api_key_source, API_KEY_SOURCE, listOf(
                     getString(R.string.settings_option_api_key_direct),
                     getString(R.string.settings_option_api_key_key_manager)
@@ -524,4 +533,15 @@ class MainActivity : AppCompatActivity() {
         val imeId = "${packageName}/${WhisperInputService::class.java.canonicalName}"
         return enabledImes.any { it.id == imeId }
     }
+
+    private fun isNotificationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Notifications are enabled by default on Android < 13
+        }
     }
+
+}

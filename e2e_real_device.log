@@ -1,0 +1,279 @@
++ generate_test_audio
++ [[ -f /tmp/test-speech-loud.wav ]]
++ log_ok 'Test audio already exists: /tmp/test-speech-loud.wav'
++ echo -e '\033[0;32m[OK]\033[0m Test audio already exists: /tmp/test-speech-loud.wav'
+[0;32m[OK][0m Test audio already exists: /tmp/test-speech-loud.wav
++ return 0
++ run_e2e_test voxtral Kj7XEVRfqyBivUTGYhpecy81Rt1MKKqb hello
++ local backend=voxtral
++ local api_key=Kj7XEVRfqyBivUTGYhpecy81Rt1MKKqb
++ local expected=hello
++ log_info '=== Real Device E2E Test ==='
++ echo -e '\033[0;34m[INFO]\033[0m === Real Device E2E Test ==='
+[0;34m[INFO][0m === Real Device E2E Test ===
++ log_info 'Backend: voxtral'
++ echo -e '\033[0;34m[INFO]\033[0m Backend: voxtral'
+[0;34m[INFO][0m Backend: voxtral
++ log_info 'Expected: hello'
++ echo -e '\033[0;34m[INFO]\033[0m Expected: hello'
+[0;34m[INFO][0m Expected: hello
++ detect_device
++ [[ -n RFCR9087PZE ]]
++ log_info 'Using specified device: RFCR9087PZE'
++ echo -e '\033[0;34m[INFO]\033[0m Using specified device: RFCR9087PZE'
+[0;34m[INFO][0m Using specified device: RFCR9087PZE
++ adb_cmd shell echo connected
++ log_ok 'Device RFCR9087PZE is connected'
++ echo -e '\033[0;32m[OK]\033[0m Device RFCR9087PZE is connected'
+[0;32m[OK][0m Device RFCR9087PZE is connected
++ [[ true != true ]]
++ log_info 'Skipping build (--skip-build)'
++ echo -e '\033[0;34m[INFO]\033[0m Skipping build (--skip-build)'
+[0;34m[INFO][0m Skipping build (--skip-build)
++ clear_app_data
++ log_info 'Clearing app data...'
++ echo -e '\033[0;34m[INFO]\033[0m Clearing app data...'
+[0;34m[INFO][0m Clearing app data...
++ adb_cmd shell pm clear com.example.whispertoinput
+Success
++ log_ok 'App data cleared'
++ echo -e '\033[0;32m[OK]\033[0m App data cleared'
+[0;32m[OK][0m App data cleared
++ grant_permissions
++ log_info 'Granting permissions...'
++ echo -e '\033[0;34m[INFO]\033[0m Granting permissions...'
+[0;34m[INFO][0m Granting permissions...
++ adb_cmd shell pm grant com.example.whispertoinput android.permission.RECORD_AUDIO
++ adb_cmd shell pm grant com.example.whispertoinput android.permission.POST_NOTIFICATIONS
++ log_ok 'Permissions granted'
++ echo -e '\033[0;32m[OK]\033[0m Permissions granted'
+[0;32m[OK][0m Permissions granted
++ enable_ime
++ log_info 'Enabling Whisper IME...'
++ echo -e '\033[0;34m[INFO]\033[0m Enabling Whisper IME...'
+[0;34m[INFO][0m Enabling Whisper IME...
++ adb_cmd shell ime enable com.example.whispertoinput/.WhisperInputService
+Input method com.example.whispertoinput/.WhisperInputService: already enabled for user #0
++ log_ok 'IME enabled via ime enable'
++ echo -e '\033[0;32m[OK]\033[0m IME enabled via ime enable'
+[0;32m[OK][0m IME enabled via ime enable
++ return 0
++ write_datastore voxtral Kj7XEVRfqyBivUTGYhpecy81Rt1MKKqb
++ local backend=voxtral
++ local api_key=Kj7XEVRfqyBivUTGYhpecy81Rt1MKKqb
++ log_info 'Writing DataStore preferences...'
++ echo -e '\033[0;34m[INFO]\033[0m Writing DataStore preferences...'
+[0;34m[INFO][0m Writing DataStore preferences...
++ local pb_file
+++ mktemp /tmp/settings-XXXXXX.pb
++ pb_file=/tmp/settings-pEajyl.pb
++ python3 -c $'\nimport sys\nsys.path.insert(0, \'scripts\')\nfrom write_datastore import build_preferences, encode_map_string_entry, encode_map_bool_entry, BACKEND_CONFIG\n\nconfig = BACKEND_CONFIG[\'voxtral\']\nentries = b\'\'\nbackend_display = {\n    \'deepgram\': \'Deepgram\', \'groq\': \'Groq\', \'60db\': \'60db\',\n    \'voxtral\': \'Voxtral (Mistral)\', \'elevenlabs\': \'ElevenLabs Scribe\', \'parakeet\': \'Groq\',\n}\nentries += encode_map_string_entry(\'speech-to-text-backend\', backend_display[\'voxtral\'])\nentries += encode_map_string_entry(\'endpoint\', config[\'endpoint\'])\nentries += encode_map_string_entry(\'api-key\', \'Kj7XEVRfqyBivUTGYhpecy81Rt1MKKqb\')\nentries += encode_map_string_entry(\'model\', config[\'model\'])\nentries += encode_map_string_entry(\'language-code\', config[\'language_code\'])\nentries += encode_map_string_entry(\'postprocessing\', \'No Conversion\')\nentries += encode_map_bool_entry(\'is-auto-recording-start\', True)\nentries += encode_map_bool_entry(\'auto-switch-back\', False)\nentries += encode_map_bool_entry(\'add-trailing-space\', False)\nentries += encode_map_bool_entry(\'use-test-file\', True)\n# Use absolute path in app-private storage (real devices can\'t read /sdcard/ without permission)\nentries += encode_map_string_entry(\'test-file-path\', \'/data/user/0/com.example.whispertoinput/files/test-speech-loud.wav\')\nwith open(\'/tmp/settings-pEajyl.pb\', \'wb\') as f:\n    f.write(entries)\n'
++ adb_cmd push /tmp/settings-pEajyl.pb /data/local/tmp/settings.preferences_pb
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE push /tmp/settings-pEajyl.pb /data/local/tmp/settings.preferences_pb
+/tmp/settings-pEajyl.pb: 1 file pushed, 0 skipped. 1.8 MB/s (438 bytes in 0.000s)
++ adb_cmd shell 'run-as com.example.whispertoinput mkdir -p files/datastore'
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell 'run-as com.example.whispertoinput mkdir -p files/datastore'
++ adb_cmd shell 'run-as com.example.whispertoinput cp /data/local/tmp/settings.preferences_pb files/datastore/settings.preferences_pb'
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell 'run-as com.example.whispertoinput cp /data/local/tmp/settings.preferences_pb files/datastore/settings.preferences_pb'
++ adb_cmd shell rm -f /data/local/tmp/settings.preferences_pb
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell rm -f /data/local/tmp/settings.preferences_pb
++ rm -f /tmp/settings-pEajyl.pb
++ log_ok 'DataStore written (backend=voxtral, test-file-mode=ON)'
++ echo -e '\033[0;32m[OK]\033[0m DataStore written (backend=voxtral, test-file-mode=ON)'
+[0;32m[OK][0m DataStore written (backend=voxtral, test-file-mode=ON)
++ push_test_audio
++ log_info 'Pushing test audio to app-private storage...'
++ echo -e '\033[0;34m[INFO]\033[0m Pushing test audio to app-private storage...'
+[0;34m[INFO][0m Pushing test audio to app-private storage...
++ adb_cmd push /tmp/test-speech-loud.wav /data/local/tmp/test-speech-loud.wav
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE push /tmp/test-speech-loud.wav /data/local/tmp/test-speech-loud.wav
+/tmp/test-speech-loud.wav: 1 file pushed, 0 skipped. 107.3 MB/s (364882 bytes in 0.003s)
++ adb_cmd shell 'run-as com.example.whispertoinput cp /data/local/tmp/test-speech-loud.wav files/test-speech-loud.wav'
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell 'run-as com.example.whispertoinput cp /data/local/tmp/test-speech-loud.wav files/test-speech-loud.wav'
++ adb_cmd shell rm -f /data/local/tmp/test-speech-loud.wav
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell rm -f /data/local/tmp/test-speech-loud.wav
++ local size
+++ adb_cmd shell 'run-as com.example.whispertoinput ls -la files/test-speech-loud.wav'
+++ awk '{print $5}'
++ size=364882
++ [[ -z 364882 ]]
++ [[ 364882 == 0 ]]
++ log_ok 'Test audio pushed to app-private storage (364882 bytes)'
++ echo -e '\033[0;32m[OK]\033[0m Test audio pushed to app-private storage (364882 bytes)'
+[0;32m[OK][0m Test audio pushed to app-private storage (364882 bytes)
++ adb_cmd shell am force-stop com.example.whispertoinput
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell am force-stop com.example.whispertoinput
++ sleep 1
++ focus_text_field
++ log_info 'Setting IME and opening app to trigger keyboard...'
++ echo -e '\033[0;34m[INFO]\033[0m Setting IME and opening app to trigger keyboard...'
+[0;34m[INFO][0m Setting IME and opening app to trigger keyboard...
++ set_default_ime com.example.whispertoinput/.WhisperInputService
++ local ime=com.example.whispertoinput/.WhisperInputService
++ adb_cmd shell ime set com.example.whispertoinput/.WhisperInputService
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell ime set com.example.whispertoinput/.WhisperInputService
+Input method com.example.whispertoinput/.WhisperInputService selected for user #0
++ local current
+++ adb_cmd shell settings get secure default_input_method
+++ local serial_flag=
+++ [[ -n RFCR9087PZE ]]
+++ serial_flag='-s RFCR9087PZE'
+++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell settings get secure default_input_method
++ current=com.example.whispertoinput/.WhisperInputService
++ [[ com.example.whispertoinput/.WhisperInputService != *com\.example\.whispertoinput/\.WhisperInputService* ]]
++ log_ok 'Default IME set to com.example.whispertoinput/.WhisperInputService'
++ echo -e '\033[0;32m[OK]\033[0m Default IME set to com.example.whispertoinput/.WhisperInputService'
+[0;32m[OK][0m Default IME set to com.example.whispertoinput/.WhisperInputService
++ sleep 0.5
++ adb_cmd shell am start -n com.example.whispertoinput/.MainActivity
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell am start -n com.example.whispertoinput/.MainActivity
++ sleep 3
++ local attempts=0
++ ((  attempts < 5  ))
++ tap_by_rid com.example.whispertoinput:id/field_debug_output
++ local field_id=com.example.whispertoinput:id/field_debug_output
++ local coords
+++ get_field_coords com.example.whispertoinput:id/field_debug_output
+++ local field_id=com.example.whispertoinput:id/field_debug_output
+++ python3 -c $'\nimport subprocess, xml.etree.ElementTree as ET, re, sys\nserial = \'RFCR9087PZE\'\nadb = \'/var/home/l/Android/Sdk/platform-tools/adb\'\nif serial:\n    dev_args = [\'-s\', serial]\nelse:\n    dev_args = []\nsubprocess.run([adb] + dev_args + [\'shell\', \'uiautomator\', \'dump\', \'/sdcard/ui.xml\'], capture_output=True)\nxml_out = subprocess.run([adb] + dev_args + [\'shell\', \'cat\', \'/sdcard/ui.xml\'], capture_output=True, text=True).stdout\nroot = ET.fromstring(xml_out)\nfor n in root.iter(\'node\'):\n    if \'com.example.whispertoinput:id/field_debug_output\' in n.get(\'resource-id\', \'\'):\n        b = n.get(\'bounds\', \'\')\n        nums = list(map(int, re.findall(r\'\\d+\', b)))\n        print((nums[0]+nums[2])//2, (nums[1]+nums[3])//2)\n        sys.exit(0)\nprint(\'\', file=sys.stderr)\nsys.exit(1)\n'
++ coords='360 440'
++ [[ -n 360 440 ]]
++ read -r x y
++ adb_cmd shell input tap 360 440
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell input tap 360 440
++ return 0
++ sleep 1.5
++ adb_cmd shell dumpsys input_method
++ grep -q mIsInputViewShown=true
++ local cur_ime
+++ adb_cmd shell dumpsys input_method
+++ grep mCurMethodId
+++ head -1
++ cur_ime='  mCurMethodId=com.example.whispertoinput/.WhisperInputService'
++ [[   mCurMethodId=com.example.whispertoinput/.WhisperInputService == *com\.example\.whispertoinput/\.WhisperInputService* ]]
++ log_ok 'Whisper keyboard is shown'
++ echo -e '\033[0;32m[OK]\033[0m Whisper keyboard is shown'
+[0;32m[OK][0m Whisper keyboard is shown
++ return 0
++ adb_cmd logcat -c
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE logcat -c
++ sleep 0.3
++ tap_mic_button
++ log_info 'Sending mic toggle broadcast...'
++ echo -e '\033[0;34m[INFO]\033[0m Sending mic toggle broadcast...'
+[0;34m[INFO][0m Sending mic toggle broadcast...
++ adb_cmd shell am broadcast -a com.example.whispertoinput.action.TOGGLE_RECORDING
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell am broadcast -a com.example.whispertoinput.action.TOGGLE_RECORDING
+Broadcasting: Intent { act=com.example.whispertoinput.action.TOGGLE_RECORDING flg=0x400000 }
+Broadcast completed: result=0
++ log_ok 'Broadcast sent'
++ echo -e '\033[0;32m[OK]\033[0m Broadcast sent'
+[0;32m[OK][0m Broadcast sent
++ wait_for_recording
++ log_info 'Waiting for recording broadcast acknowledgement...'
++ echo -e '\033[0;34m[INFO]\033[0m Waiting for recording broadcast acknowledgement...'
+[0;34m[INFO][0m Waiting for recording broadcast acknowledgement...
++ local start_time
+++ date +%s
++ start_time=1785621036
+++ date +%s
++ ((  1785621036 - start_time < 10  ))
++ local log
+++ adb_cmd logcat -d -s whisper-input:V
++ log=$'--------- beginning of main\n08-01 23:50:36.400  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING'
++ echo $'--------- beginning of main\n08-01 23:50:36.400  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING'
++ grep -q 'onReceive: action=.*TOGGLE_RECORDING'
++ log_ok 'Broadcast received by IME service'
++ echo -e '\033[0;32m[OK]\033[0m Broadcast received by IME service'
+[0;32m[OK][0m Broadcast received by IME service
++ return 0
++ sleep 1
++ tap_mic_button
++ log_info 'Sending mic toggle broadcast...'
++ echo -e '\033[0;34m[INFO]\033[0m Sending mic toggle broadcast...'
+[0;34m[INFO][0m Sending mic toggle broadcast...
++ adb_cmd shell am broadcast -a com.example.whispertoinput.action.TOGGLE_RECORDING
++ local serial_flag=
++ [[ -n RFCR9087PZE ]]
++ serial_flag='-s RFCR9087PZE'
++ /var/home/l/Android/Sdk/platform-tools/adb -s RFCR9087PZE shell am broadcast -a com.example.whispertoinput.action.TOGGLE_RECORDING
+Broadcasting: Intent { act=com.example.whispertoinput.action.TOGGLE_RECORDING flg=0x400000 }
+Broadcast completed: result=0
++ log_ok 'Broadcast sent'
++ echo -e '\033[0;32m[OK]\033[0m Broadcast sent'
+[0;32m[OK][0m Broadcast sent
++ wait_for_transcription hello
++ local expected=hello
++ local expected_lower=hello
++ log_info 'Waiting for transcription (expecting: '\''hello'\'')...'
++ echo -e '\033[0;34m[INFO]\033[0m Waiting for transcription (expecting: '\''hello'\'')...'
+[0;34m[INFO][0m Waiting for transcription (expecting: 'hello')...
++ local start
+++ date +%s
++ start=1785621037
+++ date +%s
++ ((  1785621037 - start < TRANSCRIPTION_TIMEOUT  ))
++ local log_output
+++ adb_cmd logcat -d -s whisper-input:V
++ log_output=$'--------- beginning of main\n08-01 23:50:36.400  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING\n08-01 23:50:37.496  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING'
++ echo $'--------- beginning of main\n08-01 23:50:36.400  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING\n08-01 23:50:37.496  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING'
++ grep -q 'Transcription result:'
++ echo $'--------- beginning of main\n08-01 23:50:36.400  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING\n08-01 23:50:37.496  9840  9840 D whisper-input: onReceive: action=com.example.whispertoinput.action.TOGGLE_RECORDING'
++ grep -q 'Transcription error:'
++ local text
+++ python3 -c $'\nimport subprocess, xml.etree.ElementTree as ET, re, sys\nserial = \'RFCR9087PZE\'\nadb = \'/var/home/l/Android/Sdk/platform-tools/adb\'\nif serial:\n    dev_args = [\'-s\', serial]\nelse:\n    dev_args = []\nsubprocess.run([adb] + dev_args + [\'shell\', \'uiautomator\', \'dump\', \'/sdcard/ui.xml\'], capture_output=True)\nxml_out = subprocess.run([adb] + dev_args + [\'shell\', \'cat\', \'/sdcard/ui.xml\'], capture_output=True, text=True).stdout\nroot = ET.fromstring(xml_out)\nfor n in root.iter(\'node\'):\n    rid = n.get(\'resource-id\', \'\')\n    if \'field_debug_output\' in rid:\n        print(n.get(\'text\', \'\'))\n        sys.exit(0)\nprint(\'\', file=sys.stderr)\nsys.exit(1)\n'
++ text='Hello world, this is a test of speech-to-text transcription.'
++ [[ -n Hello world, this is a test of speech-to-text transcription. ]]
++ [[ Hello world, this is a test of speech-to-text transcription. != Transcribed text will appear here\.\.\. ]]
++ local 'text_lower=hello world, this is a test of speech-to-text transcription.'
++ [[ hello world, this is a test of speech-to-text transcription. == *hello* ]]
++ log_ok 'Transcription committed (UI): Hello world, this is a test of speech-to-text transcription.'
++ echo -e '\033[0;32m[OK]\033[0m Transcription committed (UI): Hello world, this is a test of speech-to-text transcription.'
+[0;32m[OK][0m Transcription committed (UI): Hello world, this is a test of speech-to-text transcription.
++ return 0
++ log_ok '=== TEST PASSED: voxtral ==='
++ echo -e '\033[0;32m[OK]\033[0m === TEST PASSED: voxtral ==='
+[0;32m[OK][0m === TEST PASSED: voxtral ===
++ log_ok '=== ALL TESTS PASSED ==='
++ echo -e '\033[0;32m[OK]\033[0m === ALL TESTS PASSED ==='
+[0;32m[OK][0m === ALL TESTS PASSED ===
++ exit 0

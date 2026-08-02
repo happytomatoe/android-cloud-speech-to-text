@@ -1,8 +1,10 @@
-# Fedora STT
+# Android Cloud Speech-to-Text
 
-Fedora STT is a speech-to-text Android keyboard based on [Whisper To Input](https://github.com/j3soon/whisper-to-input) by Johnson Sun (@j3soon). It performs speech-to-text (STT/ASR) with OpenAI Whisper and inputs the recognized text. Supports English, Chinese, Japanese, and even mixed languages and Taiwanese.
+Android Cloud Speech-to-Text is a speech-to-text Android keyboard based on [Whisper To Input](https://github.com/j3soon/whisper-to-input) by Johnson Sun (@j3soon). It performs speech-to-text (STT/ASR) with OpenAI Whisper and inputs the recognized text. Supports English, Chinese, Japanese, and even mixed languages and Taiwanese.
 
 This is a fork of [whisper-to-input](https://github.com/j3soon/whisper-to-input) with additional features and modifications.
+
+**Repository**: https://github.com/happytomatoe/android-cloud-speech-to-text
 
 ## Features
 
@@ -13,7 +15,7 @@ This is a fork of [whisper-to-input](https://github.com/j3soon/whisper-to-input)
 
 ## Installation
 
-1. Download the APK file from [the latest release](https://github.com/happytomatoe/fedora-stt/releases/latest) to your phone.
+1. Download the APK file from [the latest release](https://github.com/happytomatoe/android-cloud-speech-to-text/releases/latest) to your phone.
 
 2. Locate the APK file in your phone and click it. Click "Install" to install the app.
 
@@ -25,7 +27,7 @@ This is a fork of [whisper-to-input](https://github.com/j3soon/whisper-to-input)
 
 6. Go to the system settings page and enable the app keyboard.
 
-7. Open any app that requires text input, such as a browser, and click the input box. Choose the app keyboard by clicking the bottom right button and choosing `Fedora STT`.
+7. Open any app that requires text input, such as a browser, and click the input box. Choose the app keyboard by clicking the bottom right button and choosing `Cloud Speech-to-Text`.
 
 8. Click the microphone button to start recording. After you finish speaking, click the microphone button again. The recognized text will be inputted into the text box.
 
