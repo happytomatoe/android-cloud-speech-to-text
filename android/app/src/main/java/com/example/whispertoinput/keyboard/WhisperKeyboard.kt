@@ -180,9 +180,33 @@ class WhisperKeyboard {
     }
 
     fun tryStartRecording() {
+        if (keyboardView == null) {
+            Log.w("WhisperKeyboard", "Keyboard view not ready, skipping recording start")
+            return
+        }
         if (keyboardStatus == KeyboardStatus.Idle) {
             setKeyboardStatus(KeyboardStatus.Recording)
             onStartRecording()
+        }
+    }
+
+    fun toggleRecording() {
+        if (keyboardView == null) {
+            Log.w("WhisperKeyboard", "Keyboard view not ready, skipping toggle")
+            return
+        }
+        when (keyboardStatus) {
+            KeyboardStatus.Idle -> {
+                setKeyboardStatus(KeyboardStatus.Recording)
+                onStartRecording()
+            }
+            KeyboardStatus.Recording -> {
+                setKeyboardStatus(KeyboardStatus.Transcribing)
+                onStartTranscribing("")
+            }
+            KeyboardStatus.Transcribing -> {
+                // Do nothing to avoid double-clicking by mistake
+            }
         }
     }
 

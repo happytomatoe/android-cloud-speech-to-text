@@ -36,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.whispertoinput.BuildConfig
 
 private const val RECORDED_AUDIO_FILENAME_M4A = "recorded.m4a"
@@ -56,6 +57,9 @@ class WhisperInputService : InputMethodService() {
     private var useOggFormat: Boolean = false
     private var testFileModeRecording: Boolean = false  // Track test file recording state
 
+    // Key Manager
+    private var keyManagerClient: KeyManagerClient? = null
+
     // Keyboard
     private val whisperKeyboard = WhisperKeyboard()
 
@@ -63,8 +67,8 @@ class WhisperInputService : InputMethodService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             android.util.Log.d("whisper-input", "onReceive: action=${intent?.action}")
             if (intent?.action == ACTION_TOGGLE_RECORDING) {
-                // External toggle: start recording if idle (user taps mic to stop/transcribe)
-                whisperKeyboard.tryStartRecording()
+                // External toggle: toggle recording state
+                whisperKeyboard.toggleRecording()
             }
         }
     }
@@ -74,6 +78,10 @@ class WhisperInputService : InputMethodService() {
         android.util.Log.d("whisper-input", "onCreate: registering receiver")
         registerReceiver(toggleReceiver, IntentFilter(ACTION_TOGGLE_RECORDING), Context.RECEIVER_EXPORTED)
         android.util.Log.d("whisper-input", "onCreate: receiver registered")
+
+        // Bind to Key Manager
+        keyManagerClient = KeyManagerClient(this)
+        keyManagerClient?.bind()
     }
 
     private fun transcriptionCallback(text: String?) {
@@ -187,6 +195,25 @@ class WhisperInputService : InputMethodService() {
 
     private fun startTranscribing(attachToEnd: String) {
         CoroutineScope(Dispatchers.Main).launch {
+            // Get valid API key from key-manager
+            val apiKey = withContext(Dispatchers.IO) {
+                keyManagerClient?.getValidApiKey()
+            }
+
+            if (apiKey == null) {
+                // Key-manager not available or not configured
+                val message = if (keyManagerClient?.bind() == false) {
+                    "Key Manager app not installed"
+                } else {
+                    "Key Manager not configured. Open Key Manager app to set credentials."
+                }
+                
+                lastTranscriptionError = message
+                Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()
+                whisperKeyboard.reset()
+                return@launch
+            }
+
             val useTestFile = if (BuildConfig.DEBUG) {
                 dataStore.data.map { it[USE_TEST_FILE] ?: false }.first()
             } else false
@@ -202,6 +229,7 @@ class WhisperInputService : InputMethodService() {
                     testFilePath,
                     AUDIO_MEDIA_TYPE_WAV,
                     attachToEnd,
+                    apiKey,
                     { text ->
                         android.util.Log.d("whisper-input", "Transcription result: '$text'")
                         transcriptionCallback(text)
@@ -218,6 +246,7 @@ class WhisperInputService : InputMethodService() {
                     recordedAudioFilename,
                     audioMediaType,
                     attachToEnd,
+                    apiKey,
                     { text ->
                         android.util.Log.d("whisper-input", "Transcription result: '$text'")
                         transcriptionCallback(text)
@@ -262,9 +291,10 @@ class WhisperInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        keyManagerClient?.unbind()
         whisperTranscriber.stop()
         recorderManager.stop()
         unregisterReceiver(toggleReceiver)
+        super.onDestroy()
     }
 }
