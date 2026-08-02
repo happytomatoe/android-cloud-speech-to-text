@@ -76,6 +76,8 @@ val TEST_FILE_PATH = stringPreferencesKey("test-file-path")
 
 class MainActivity : AppCompatActivity() {
     private var setupSettingItemsDone: Boolean = false
+    private var openedImeSettings: Boolean = false
+    private var wasImeEnabledBeforeSettings: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,10 +103,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Check if IME was enabled while user was in Settings
-        if (setupSettingItemsDone && isImeEnabled()) {
+        // Only show success toast if we opened IME settings and IME transitioned from disabled to enabled
+        if (openedImeSettings && !wasImeEnabledBeforeSettings && isImeEnabled()) {
             Toast.makeText(this, R.string.ime_enabled_success, Toast.LENGTH_SHORT).show()
         }
+        openedImeSettings = false
+        wasImeEnabledBeforeSettings = false
     }
 
     // The onClick event of the grant permission button.
@@ -432,8 +436,9 @@ class MainActivity : AppCompatActivity() {
                                 .setTitle(R.string.notification_enable_dialog_title)
                                 .setMessage(R.string.notification_enable_dialog_message)
                                 .setPositiveButton(R.string.notification_enable_dialog_enable) { _, _ ->
-                                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
                                         .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                                        .putExtra(Settings.EXTRA_CHANNEL_ID, NOTIFICATION_CHANNEL_ID)
                                     startActivity(intent)
                                 }
                                 .setNegativeButton(R.string.ime_enable_dialog_later, null)
@@ -538,10 +543,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 Toast.makeText(this@MainActivity, R.string.successfully_set, Toast.LENGTH_SHORT).show()
                 if (!isImeEnabled()) {
+                    wasImeEnabledBeforeSettings = false
                     androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
                         .setTitle(R.string.ime_enable_dialog_title)
                         .setMessage(R.string.ime_enable_dialog_message)
                         .setPositiveButton(R.string.ime_enable_dialog_enable) { _, _ ->
+                            openedImeSettings = true
                             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                         }
                         .setNegativeButton(R.string.ime_enable_dialog_later, null)

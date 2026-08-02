@@ -231,8 +231,8 @@ class WhisperInputService : InputMethodService() {
                         KeyManagerClient.ConnectionState.APP_NOT_INSTALLED -> "Key Manager app not installed"
                         KeyManagerClient.ConnectionState.PERMISSION_MISSING -> "Key Manager installed but permission missing. Reinstall this app after Key Manager."
                         KeyManagerClient.ConnectionState.CONNECTED -> "Key Manager not configured. Open Key Manager app to set credentials."
-                        KeyManagerClient.ConnectionState.READY -> "Key Manager app not installed"
-                        null -> "Key Manager app not installed"
+                        KeyManagerClient.ConnectionState.READY -> "Key Manager service is not connected. Try again."
+                        null -> "Key Manager is unavailable. Open Key Manager and try again."
                     }
                     lastTranscriptionError = message
                     Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()

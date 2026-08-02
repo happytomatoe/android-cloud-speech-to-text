@@ -133,12 +133,10 @@ class KeyManagerClient(private val context: Context, private var packageName: St
      * @return true if app is installed
      */
     fun isAppInstalled(): Boolean {
-        return try {
-            context.packageManager.getPackageInfo(packageName, 0)
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        }
+        val intent = Intent(KeyManagerConstants.KEY_MANAGER_ACTION)
+        intent.setPackage(packageName)
+        val resolveInfos = context.packageManager.queryIntentServices(intent, PackageManager.GET_RESOLVED_FILTER)
+        return resolveInfos.isNotEmpty()
     }
 
     /**
