@@ -25,11 +25,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.view.View
-import android.widget.ImageButton
-import android.widget.TextView
 import android.widget.Toast
 import androidx.datastore.preferences.core.Preferences
 import com.example.whispertoinput.recorder.RecorderManager
+import com.example.whispertoinput.keyboard.WhisperKeyboard
 import com.github.liuyueyi.quick.transfer.ChineseUtils
 import com.github.liuyueyi.quick.transfer.constants.TransType
 import kotlinx.coroutines.CoroutineScope
@@ -37,11 +36,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.example.whispertoinput.BuildConfig
 
 private const val RECORDED_AUDIO_FILENAME_M4A = "recorded.m4a"
 private const val RECORDED_AUDIO_FILENAME_OGG = "recorded.ogg"
 private const val AUDIO_MEDIA_TYPE_M4A = "audio/mp4"
 private const val AUDIO_MEDIA_TYPE_OGG = "audio/ogg"
+private const val AUDIO_MEDIA_TYPE_WAV = "audio/wav"
 
 /**
  * Voice input method service with tap-to-toggle recording.
@@ -53,30 +55,39 @@ class WhisperInputService : InputMethodService() {
     private var recordedAudioFilename: String = ""
     private var audioMediaType: String = AUDIO_MEDIA_TYPE_M4A
     private var useOggFormat: Boolean = false
+    private var testFileModeRecording: Boolean = false  // Track test file recording state
 
-    // UI elements
-    private var micButton: ImageButton? = null
-    private var statusLabel: TextView? = null
+    // Key Manager
+    private var keyManagerClient: KeyManagerClient? = null
 
-    companion object {
-        const val ACTION_TOGGLE_RECORDING = "com.example.whispertoinput.action.TOGGLE_RECORDING"
-    }
+    // Keyboard
+    private val whisperKeyboard = WhisperKeyboard()
 
     private val toggleReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            android.util.Log.d("whisper-input", "onReceive: action=${intent?.action}")
             if (intent?.action == ACTION_TOGGLE_RECORDING) {
-                toggleRecording()
+                // External toggle: toggle recording state
+                whisperKeyboard.toggleRecording()
             }
         }
     }
 
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.d("whisper-input", "onCreate: registering receiver")
         registerReceiver(toggleReceiver, IntentFilter(ACTION_TOGGLE_RECORDING), Context.RECEIVER_EXPORTED)
+        android.util.Log.d("whisper-input", "onCreate: receiver registered")
+
+        // Bind to Key Manager
+        keyManagerClient = KeyManagerClient(this)
+        keyManagerClient?.bind()
     }
 
     private fun transcriptionCallback(text: String?) {
         if (!text.isNullOrEmpty()) {
+            lastTranscriptionResult = text
+            lastTranscriptionError = null
             currentInputConnection?.commitText(text, 1)
             CoroutineScope(Dispatchers.Main).launch {
                 val autoSwitchBack = dataStore.data.map { preferences: Preferences ->
@@ -87,12 +98,21 @@ class WhisperInputService : InputMethodService() {
                 }
             }
         }
-        updateMicUI(false)
+        whisperKeyboard.reset()
     }
 
     private fun transcriptionExceptionCallback(message: String) {
+        // Store error for display in MainActivity debug field
+        lastTranscriptionError = message
+        android.util.Log.e("whisper-input", "Transcription error: $message")
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        updateMicUI(false)
+        whisperKeyboard.reset()
+    }
+
+    companion object {
+        const val ACTION_TOGGLE_RECORDING = "com.example.whispertoinput.action.TOGGLE_RECORDING"
+        var lastTranscriptionResult: String? = null
+        var lastTranscriptionError: String? = null
     }
 
     private suspend fun updateAudioFormat() {
@@ -111,14 +131,7 @@ class WhisperInputService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        val view = layoutInflater.inflate(R.layout.keyboard_view, null)
-
-        micButton = view.findViewById(R.id.btn_mic)
-        statusLabel = view.findViewById(R.id.label_status)
-
-        micButton?.setOnClickListener {
-            toggleRecording()
-        }
+        android.util.Log.d("whisper-input", "onCreateInputView: creating keyboard view")
 
         // Preload conversion table
         ChineseUtils.preLoad(true, TransType.SIMPLE_TO_TAIWAN)
@@ -128,57 +141,165 @@ class WhisperInputService : InputMethodService() {
             updateAudioFormat()
         }
 
+        val view = whisperKeyboard.setup(
+            layoutInflater = layoutInflater,
+            shouldOfferImeSwitch = true,
+            onStartRecording = { startRecording() },
+            onCancelRecording = { cancelRecording() },
+            onStartTranscribing = { attachToEnd -> startTranscribing(attachToEnd) },
+            onCancelTranscribing = { cancelTranscribing() },
+            onButtonBackspace = { performBackspace() },
+            onEnter = { performEnter() },
+            onSpaceBar = { performSpace() },
+            onSwitchIme = { switchToPreviousInputMethod() },
+            onOpenSettings = { launchMainActivity() },
+            shouldShowRetry = { lastTranscriptionError != null }
+        )
+
+        android.util.Log.d("whisper-input", "onCreateInputView: keyboard view created")
         return view
     }
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // Don't auto-start — wait for mic button tap
+        // Auto-start recording when keyboard appears
+        whisperKeyboard.tryStartRecording()
     }
 
-    private fun toggleRecording() {
+    private fun startRecording() {
         if (!recorderManager.allPermissionsGranted(this)) {
             launchMainActivity()
             return
         }
 
-        if (recorderManager.isRecording) {
-            // Stop recording and transcribe
-            recorderManager.stop()
-            updateMicUI(false)
-            statusLabel?.text = getString(R.string.transcribing)
+        CoroutineScope(Dispatchers.Main).launch {
+            val useTestFile = if (BuildConfig.DEBUG) {
+                dataStore.data.map { it[USE_TEST_FILE] ?: false }.first()
+            } else false
 
-            whisperTranscriber.startAsync(this,
-                recordedAudioFilename,
-                audioMediaType,
-                "",
-                { text ->
-                    android.util.Log.d("whisper-input", "Transcription result: '$text'")
-                    transcriptionCallback(text)
-                },
-                { msg ->
-                    android.util.Log.e("whisper-input", "Transcription error: $msg")
-                    transcriptionExceptionCallback(msg)
-                })
-        } else {
-            // Start recording
-            CoroutineScope(Dispatchers.Main).launch {
+            if (useTestFile) {
+                testFileModeRecording = true
+            } else {
                 updateAudioFormat()
                 recorderManager.start(this@WhisperInputService, recordedAudioFilename, useOggFormat)
-                updateMicUI(true)
-                statusLabel?.text = getString(R.string.recording)
             }
         }
     }
 
-    private fun updateMicUI(isRecording: Boolean) {
-        if (isRecording) {
-            micButton?.setImageResource(R.drawable.mic_pressed)
-            statusLabel?.text = getString(R.string.recording)
-        } else {
-            micButton?.setImageResource(R.drawable.mic_idle)
-            statusLabel?.text = getString(R.string.whisper_to_input)
+    private fun cancelRecording() {
+        if (recorderManager.isRecording) {
+            recorderManager.stop()
         }
+        testFileModeRecording = false
+    }
+
+    private fun startTranscribing(attachToEnd: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            // Check API key source preference
+            val apiKeySource = dataStore.data.map { preferences ->
+                preferences[API_KEY_SOURCE] ?: getString(R.string.settings_option_api_key_direct)
+            }.first()
+
+            val apiKey: String?
+            if (apiKeySource == getString(R.string.settings_option_api_key_direct)) {
+                // Direct mode: read API key from settings
+                apiKey = dataStore.data.map { preferences ->
+                    preferences[API_KEY] ?: ""
+                }.first()
+                if (apiKey.isNullOrEmpty()) {
+                    lastTranscriptionError = "API Key is not set. Open Settings to enter your API key."
+                    Toast.makeText(this@WhisperInputService, lastTranscriptionError, Toast.LENGTH_LONG).show()
+                    whisperKeyboard.reset()
+                    return@launch
+                }
+            } else {
+                // Key Manager mode: get API key from key-manager service
+                // Read selected key-manager app preference
+                val keyManagerApp = dataStore.data.map { preferences ->
+                    preferences[KEY_MANAGER_APP] ?: getString(R.string.settings_option_key_manager_default)
+                }.first()
+
+                // Update key-manager client with selected package
+                keyManagerClient?.setPackageName(keyManagerApp)
+
+                apiKey = withContext(Dispatchers.IO) {
+                    keyManagerClient?.getValidApiKeyWithRetry()
+                }
+                if (apiKey == null) {
+                    val state = keyManagerClient?.getState()
+                    val message = when (state) {
+                        KeyManagerClient.ConnectionState.APP_NOT_INSTALLED -> "Key Manager app not installed"
+                        KeyManagerClient.ConnectionState.PERMISSION_MISSING -> "Key Manager installed but permission missing. Reinstall this app after Key Manager."
+                        KeyManagerClient.ConnectionState.CONNECTED -> "Key Manager not configured. Open Key Manager app to set credentials."
+                        KeyManagerClient.ConnectionState.READY -> "Key Manager app not installed"
+                        null -> "Key Manager app not installed"
+                    }
+                    lastTranscriptionError = message
+                    Toast.makeText(this@WhisperInputService, message, Toast.LENGTH_LONG).show()
+                    whisperKeyboard.reset()
+                    return@launch
+                }
+            }
+
+            val useTestFile = if (BuildConfig.DEBUG) {
+                dataStore.data.map { it[USE_TEST_FILE] ?: false }.first()
+            } else false
+
+            if (useTestFile) {
+                // Test file mode: stop recording and transcribe test file
+                testFileModeRecording = false
+                val testFilePath = dataStore.data
+                    .map { it[TEST_FILE_PATH] ?: "/sdcard/test-speech-loud.wav" }
+                    .first()
+
+                whisperTranscriber.startAsync(this@WhisperInputService,
+                    testFilePath,
+                    AUDIO_MEDIA_TYPE_WAV,
+                    attachToEnd,
+                    apiKey,
+                    { text ->
+                        android.util.Log.d("whisper-input", "Transcription result: '$text'")
+                        transcriptionCallback(text)
+                    },
+                    { msg ->
+                        android.util.Log.e("whisper-input", "Transcription error: $msg")
+                        transcriptionExceptionCallback(msg)
+                    })
+            } else if (recorderManager.isRecording) {
+                // Normal mode: stop recording and transcribe
+                recorderManager.stop()
+
+                whisperTranscriber.startAsync(this@WhisperInputService,
+                    recordedAudioFilename,
+                    audioMediaType,
+                    attachToEnd,
+                    apiKey,
+                    { text ->
+                        android.util.Log.d("whisper-input", "Transcription result: '$text'")
+                        transcriptionCallback(text)
+                    },
+                    { msg ->
+                        android.util.Log.e("whisper-input", "Transcription error: $msg")
+                        transcriptionExceptionCallback(msg)
+                    })
+            }
+        }
+    }
+
+    private fun cancelTranscribing() {
+        whisperTranscriber.stop()
+    }
+
+    private fun performBackspace() {
+        currentInputConnection?.deleteSurroundingText(1, 0)
+    }
+
+    private fun performEnter() {
+        currentInputConnection?.commitText("\n", 1)
+    }
+
+    private fun performSpace() {
+        currentInputConnection?.commitText(" ", 1)
     }
 
     private fun launchMainActivity() {
@@ -192,14 +313,15 @@ class WhisperInputService : InputMethodService() {
         android.util.Log.d("whisper-input", "onWindowHidden: isRecording=${recorderManager.isRecording}")
         if (recorderManager.isRecording) {
             recorderManager.stop()
-            updateMicUI(false)
         }
+        whisperKeyboard.reset()
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        keyManagerClient?.unbind()
         whisperTranscriber.stop()
         recorderManager.stop()
         unregisterReceiver(toggleReceiver)
+        super.onDestroy()
     }
 }

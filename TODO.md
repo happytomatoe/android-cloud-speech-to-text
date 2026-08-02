@@ -1,0 +1,1 @@
+- Currently the method that should detect that we changed the input method doesn't work. So basically when I press apply multiple times and I already enabled the new keyboard I'm still getting the alert dialog to do that again.

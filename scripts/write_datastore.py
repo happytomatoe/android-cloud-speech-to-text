@@ -44,12 +44,17 @@ def encode_string_field(field_number: int, value: str) -> bytes:
 def encode_map_string_entry(key: str, string_value: str) -> bytes:
     """Encode a map<string, Value> entry where Value.string = string_value.
 
-    Map entry structure:
-      field 1 (string): key
-      field 2 (Value):  { field 4 (string): string_value }
+    Map entry structure (from androidx.datastore.preferences.proto):
+      Preferences.preferences (map<string, Value>) = field 1
+      MapEntry:
+        field 1 (string): key
+        field 2 (Value): { field 5 (string): string_value }
+      Value.oneof.value:
+        string = 5
     """
     key_field = encode_string_field(1, key)
-    value_payload = encode_string_field(4, string_value)
+    # Value.string = field 5 (not 4!)
+    value_payload = encode_string_field(5, string_value)
     value_field = encode_bytes(2, value_payload)
     entry = key_field + value_field
     return encode_bytes(1, entry)  # field 1 of Preferences = map entry
@@ -58,9 +63,13 @@ def encode_map_string_entry(key: str, string_value: str) -> bytes:
 def encode_map_bool_entry(key: str, bool_value: bool) -> bytes:
     """Encode a map<string, Value> entry where Value.boolean = bool_value.
 
-    Map entry structure:
-      field 1 (string): key
-      field 2 (Value):  { field 1 (bool): bool_value }
+    Map entry structure (from androidx.datastore.preferences.proto):
+      Preferences.preferences (map<string, Value>) = field 1
+      MapEntry:
+        field 1 (string): key
+        field 2 (Value): { field 1 (bool): bool_value }
+      Value.oneof.value:
+        boolean = 1
     """
     key_field = encode_string_field(1, key)
     value_payload = encode_varint_field(1, 1 if bool_value else 0)
@@ -85,10 +94,20 @@ BACKEND_CONFIG = {
         "model": "60db-stt-v01",
         "language_code": "",
     },
+    "voxtral": {
+        "endpoint": "https://api.mistral.ai/v1/audio/transcriptions",
+        "model": "voxtral-mini-latest",
+        "language_code": "auto",
+    },
     "elevenlabs": {
         "endpoint": "https://api.elevenlabs.io/v1/speech-to-text",
         "model": "scribe_v1",
         "language_code": "auto",
+    },
+    "parakeet": {
+        "endpoint": "http://10.0.2.2:5092/v1/audio/transcriptions",
+        "model": "parakeet-tdt-0.6b",
+        "language_code": "",
     },
 }
 
@@ -101,7 +120,9 @@ def build_preferences(backend: str, api_key: str) -> bytes:
         "deepgram": "Deepgram",
         "groq": "Groq",
         "60db": "60db",
+        "voxtral": "Voxtral (Mistral)",
         "elevenlabs": "ElevenLabs Scribe",
+        "parakeet": "Groq",  # Uses Groq request format
     }
     entries += encode_map_string_entry("speech-to-text-backend", backend_display[backend])
     entries += encode_map_string_entry("endpoint", config["endpoint"])
@@ -112,13 +133,15 @@ def build_preferences(backend: str, api_key: str) -> bytes:
     entries += encode_map_bool_entry("is-auto-recording-start", True)
     entries += encode_map_bool_entry("auto-switch-back", False)
     entries += encode_map_bool_entry("add-trailing-space", False)
+    entries += encode_map_bool_entry("use-test-file", True)
+    entries += encode_map_string_entry("test-file-path", "/sdcard/test-speech-loud.wav")
     return entries
 
 
 def main():
     parser = argparse.ArgumentParser(description="Write whisper-to-input DataStore preferences")
-    parser.add_argument("--backend", required=True, choices=["deepgram", "groq", "60db", "elevenlabs"])
-    parser.add_argument("--key", required=True, help="API key for the backend")
+    parser.add_argument("--backend", required=True, choices=["deepgram", "groq", "60db", "voxtral", "elevenlabs", "parakeet"])
+    parser.add_argument("--key", default="", help="API key for the backend (not required for parakeet)")
     parser.add_argument("-o", "--output", help="Output file (default: stdout)")
     args = parser.parse_args()
 

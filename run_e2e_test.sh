@@ -56,7 +56,7 @@ EMULATOR_WAS_RUNNING=false
 exec > >(tee "$LOG_FILE") 2>&1
 
 # Default API keys (sourced from keyring / prior sessions)
-DEEPGRAM_KEY_DEFAULT="f97f6e1e42b697792bfe1867f7679fdeaace4de8"
+DEEPGRAM_KEY_DEFAULT="11f60d2a5f21c0a181961250804ba123e3261107"
 
 # Backend configuration
 declare -A BACKEND_ENDPOINT=(
@@ -64,6 +64,8 @@ declare -A BACKEND_ENDPOINT=(
     ["groq"]="https://api.groq.com/openai/v1/audio/transcriptions"
     ["60db"]="https://api.60db.ai/stt"
     ["elevenlabs"]="https://api.elevenlabs.io/v1/speech-to-text"
+    ["voxtral"]="https://api.mistral.ai/v1/audio/transcriptions"
+    ["parakeet"]="http://10.0.2.2:5092/v1/audio/transcriptions"
 )
 
 declare -A BACKEND_MODEL=(
@@ -71,6 +73,8 @@ declare -A BACKEND_MODEL=(
     ["groq"]="whisper-large-v3-turbo"
     ["60db"]="60db-stt-v01"
     ["elevenlabs"]="scribe_v1"
+    ["voxtral"]="voxtral-mini-latest"
+    ["parakeet"]="parakeet-tdt-0.6b"
 )
 
 declare -A BACKEND_DISPLAY=(
@@ -78,6 +82,8 @@ declare -A BACKEND_DISPLAY=(
     ["groq"]="Groq"
     ["60db"]="60db"
     ["elevenlabs"]="ElevenLabs Scribe"
+    ["voxtral"]="Voxtral (Mistral)"
+    ["parakeet"]="Groq"  # Uses Groq request format in app
 )
 
 # Timeouts
@@ -756,10 +762,11 @@ cleanup() {
     log_info "Cleaning up..."
     if [[ "$EMULATOR_WAS_RUNNING" != "true" ]]; then
         stop_emulator
+        cleanup_virtual_mic
     else
-        log_info "Emulator was pre-existing — leaving it running"
+        log_info "Emulator was pre-existing — leaving it running (and the virtual mic it needs)"
+        log_info "Virtual mic chain is left intact for the next run to reuse the same emulator"
     fi
-    cleanup_virtual_mic
     log_ok "Cleanup complete"
 }
 
@@ -792,10 +799,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             cat <<EOF
-Usage: $0 --backend <deepgram|groq|60db> --key <API_KEY> --expected <substring> [--headful]
+Usage: $0 --backend <deepgram|groq|60db|voxtral|parakeet> --key <API_KEY> --expected <substring> [--headful]
 
 Options:
-  --backend   Backend to test (deepgram, groq, 60db)
+  --backend   Backend to test (deepgram, groq, 60db, voxtral, parakeet)
   --key       API key for the backend
   --expected  Expected substring in transcription result
   --headful   Run emulator with visible window (default: headless)
@@ -820,7 +827,7 @@ fi
 
 # Validate backend
 if [[ ! "${BACKEND_DISPLAY[$BACKEND]+_}" ]]; then
-    die "Invalid backend: $BACKEND (must be deepgram, groq, 60db, or elevenlabs)"
+    die "Invalid backend: $BACKEND (must be deepgram, groq, 60db, voxtral, elevenlabs, or parakeet)"
 fi
 
 # API key: explicit arg → env var → embedded default
@@ -830,6 +837,10 @@ if [[ -z "$API_KEY" ]]; then
 fi
 if [[ -z "$API_KEY" && "$BACKEND" == "deepgram" ]]; then
     API_KEY="$DEEPGRAM_KEY_DEFAULT"
+fi
+# Parakeet doesn't need a real API key
+if [[ -z "$API_KEY" && "$BACKEND" == "parakeet" ]]; then
+    API_KEY="parakeet-local"
 fi
 
 if [[ -z "$API_KEY" ]]; then

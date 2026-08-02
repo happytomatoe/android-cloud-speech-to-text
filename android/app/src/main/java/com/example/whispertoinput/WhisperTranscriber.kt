@@ -42,7 +42,6 @@ class WhisperTranscriber {
         val endpoint: String,
         val languageCode: String,
         val speechToTextBackend: String,
-        val apiKey: String,
         val model: String,
         val postprocessing: String,
         val addTrailingSpace: Boolean
@@ -56,17 +55,17 @@ class WhisperTranscriber {
         filename: String,
         mediaType: String,
         attachToEnd: String,
+        apiKey: String,
         callback: (String?) -> Unit,
         exceptionCallback: (String) -> Unit
     ) {
         suspend fun makeWhisperRequest(): String {
             // Retrieve configs
-            val (endpoint, languageCode, speechToTextBackend, apiKey, model, postprocessing, addTrailingSpace) = context.dataStore.data.map { preferences: Preferences ->
+            val (endpoint, languageCode, speechToTextBackend, model, postprocessing, addTrailingSpace) = context.dataStore.data.map { preferences: Preferences ->
                 Config(
                     preferences[ENDPOINT] ?: "",
                     preferences[LANGUAGE_CODE] ?: "",
                     preferences[SPEECH_TO_TEXT_BACKEND] ?: context.getString(R.string.settings_option_openai_api),
-                    preferences[API_KEY] ?: "",
                     preferences[MODEL] ?: "",
                     preferences[POSTPROCESSING] ?: context.getString(R.string.settings_option_no_conversion),
                     preferences[ADD_TRAILING_SPACE] ?: false

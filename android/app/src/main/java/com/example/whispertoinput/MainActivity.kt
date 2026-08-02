@@ -33,7 +33,10 @@ import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
+import android.view.inputmethod.InputMethodManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doOnTextChanged
 import androidx.datastore.core.DataStore
@@ -63,6 +66,10 @@ val AUTO_RECORDING_START = booleanPreferencesKey("is-auto-recording-start")
 val AUTO_SWITCH_BACK = booleanPreferencesKey("auto-switch-back")
 val ADD_TRAILING_SPACE = booleanPreferencesKey("add-trailing-space")
 val POSTPROCESSING = stringPreferencesKey("postprocessing")
+val API_KEY_SOURCE = stringPreferencesKey("api-key-source")
+val KEY_MANAGER_APP = stringPreferencesKey("key-manager-app")
+val USE_TEST_FILE = booleanPreferencesKey("use-test-file")
+val TEST_FILE_PATH = stringPreferencesKey("test-file-path")
 
 class MainActivity : AppCompatActivity() {
     private var setupSettingItemsDone: Boolean = false
@@ -72,6 +79,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setupSettingItems()
         checkPermissions()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Check if IME was enabled while user was in Settings
+        if (setupSettingItemsDone && isImeEnabled()) {
+            Toast.makeText(this, R.string.ime_enabled_success, Toast.LENGTH_SHORT).show()
+        }
     }
 
     // The onClick event of the grant permission button.
@@ -372,6 +387,39 @@ class MainActivity : AppCompatActivity() {
                                 val languageCodeEditText: EditText = findViewById<EditText>(R.id.field_language_code)
                                 languageCodeEditText.setText(getString(R.string.settings_option_60db_default_language))
                             }
+                            // Update Create API Key link
+                            val createKeyLink = findViewById<TextView>(R.id.link_create_api_key)
+                            val providerUrls = mapOf(
+                                getString(R.string.settings_option_openai_api) to "https://platform.openai.com/api-keys",
+                                getString(R.string.settings_option_voxtral) to "https://console.mistral.ai/?profile_dialog=api-keys",
+                                getString(R.string.settings_option_elevenlabs) to "https://elevenlabs.io/app/settings/api-keys",
+                                getString(R.string.settings_option_deepgram) to "https://console.deepgram.com/project/default/settings/api-keys",
+                                getString(R.string.settings_option_groq) to "https://console.groq.com/keys",
+                                getString(R.string.settings_option_60db) to "https://app.60db.ai/app/developers"
+                            )
+                            val url = providerUrls[selectedItem as? String]
+                            if (url != null) {
+                                createKeyLink.visibility = View.VISIBLE
+                                createKeyLink.paint.isUnderlineText = true
+                                createKeyLink.setOnClickListener {
+                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            } else {
+                                createKeyLink.visibility = View.GONE
+                            }
+                        }
+                        // Prompt for notification permission after changing backend
+                        if (!isNotificationPermissionGranted()) {
+                            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                                .setTitle(R.string.notification_enable_dialog_title)
+                                .setMessage(R.string.notification_enable_dialog_message)
+                                .setPositiveButton(R.string.notification_enable_dialog_enable) { _, _ ->
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                    intent.data = Uri.fromParts("package", packageName, null)
+                                    startActivity(intent)
+                                }
+                                .setNegativeButton(R.string.ime_enable_dialog_later, null)
+                                .show()
                         }
                     }
                     override fun onNothingSelected(parent: AdapterView<*>) { }
@@ -387,6 +435,28 @@ class MainActivity : AppCompatActivity() {
                     spinner.adapter.getItem(it) == value
                 }
                 spinner.setSelection(index ?: 0, false)
+                // Update Create API Key link for initial selection
+                if (preferenceKey == SPEECH_TO_TEXT_BACKEND) {
+                    val createKeyLink = findViewById<TextView>(R.id.link_create_api_key)
+                    val providerUrls = mapOf(
+                        getString(R.string.settings_option_openai_api) to "https://platform.openai.com/api-keys",
+                        getString(R.string.settings_option_voxtral) to "https://console.mistral.ai/?profile_dialog=api-keys",
+                        getString(R.string.settings_option_elevenlabs) to "https://elevenlabs.io/app/settings/api-keys",
+                        getString(R.string.settings_option_deepgram) to "https://console.deepgram.com/project/default/settings/api-keys",
+                        getString(R.string.settings_option_groq) to "https://console.groq.com/keys",
+                        getString(R.string.settings_option_60db) to "https://app.60db.ai/app/developers"
+                    )
+                    val url = providerUrls[value]
+                    if (url != null) {
+                        createKeyLink.visibility = View.VISIBLE
+                        createKeyLink.paint.isUnderlineText = true
+                        createKeyLink.setOnClickListener {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }
+                    } else {
+                        createKeyLink.visibility = View.GONE
+                    }
+                }
                 spinner.isEnabled = true
             }
         }
@@ -425,16 +495,18 @@ class MainActivity : AppCompatActivity() {
                 SettingDropdown(R.id.spinner_auto_switch_back, AUTO_SWITCH_BACK, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
-                ), false),
+                ), true),
                 SettingDropdown(R.id.spinner_add_trailing_space, ADD_TRAILING_SPACE, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
                 ), false),
-                SettingStringDropdown(R.id.spinner_postprocessing, POSTPROCESSING, listOf(
-                    getString(R.string.settings_option_to_traditional),
-                    getString(R.string.settings_option_to_simplified),
-                    getString(R.string.settings_option_no_conversion)
-                ), getString(R.string.settings_option_to_traditional)),
+                SettingStringDropdown(R.id.spinner_api_key_source, API_KEY_SOURCE, listOf(
+                    getString(R.string.settings_option_api_key_direct),
+                    getString(R.string.settings_option_api_key_key_manager)
+                ), getString(R.string.settings_option_api_key_direct)),
+                SettingStringDropdown(R.id.spinner_key_manager_app, KEY_MANAGER_APP, listOf(
+                    getString(R.string.settings_option_key_manager_default)
+                ), getString(R.string.settings_option_key_manager_default)),
             )
             val btnApply: Button = findViewById(R.id.btn_settings_apply)
             btnApply.isEnabled = false
@@ -447,9 +519,37 @@ class MainActivity : AppCompatActivity() {
                     btnApply.isEnabled = false
                 }
                 Toast.makeText(this@MainActivity, R.string.successfully_set, Toast.LENGTH_SHORT).show()
+                if (!isImeEnabled()) {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle(R.string.ime_enable_dialog_title)
+                        .setMessage(R.string.ime_enable_dialog_message)
+                        .setPositiveButton(R.string.ime_enable_dialog_enable) { _, _ ->
+                            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                        }
+                        .setNegativeButton(R.string.ime_enable_dialog_later, null)
+                        .show()
+                }
             }
             settingItems.map { settingItem -> settingItem.setup() }.joinAll()
             setupSettingItemsDone = true
         }
     }
+
+    private fun isImeEnabled(): Boolean {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        val enabledImes = imm.enabledInputMethodList
+        val imeId = "${packageName}/${WhisperInputService::class.java.canonicalName}"
+        return enabledImes.any { it.id == imeId }
+    }
+
+    private fun isNotificationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Notifications are enabled by default on Android < 13
+        }
+    }
+
 }

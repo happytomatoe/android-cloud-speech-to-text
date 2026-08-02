@@ -3,3 +3,39 @@
 test-sources/*.wav
 test-sources/*.mp3
 test-sources/*.ogg
+
+# Rotated API keys
+*.env
+.whisper-to-input.env
+
+# Pi session data and agent config
+.pi*/
+.pi/
+.pi-glla/
+.agents/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Android build artifacts (root-level)
+android/build/
+android/.gradle/
+
+# IDE files
+.idea/
+*.iml
+
+# Local Android SDK path
+local.properties
+
+# Built APKs
+*.apk
+
+# Keystore files (security sensitive!)
+*.jks
+*.keystore
+
+# OS-specific files
+.DS_Store
+Thumbs.db
