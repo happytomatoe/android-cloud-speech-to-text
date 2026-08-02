@@ -7,3 +7,5 @@ test-sources/*.ogg
 # Rotated API keys
 *.env
 .whisper-to-input.env
+.pi*/
+.pi/
