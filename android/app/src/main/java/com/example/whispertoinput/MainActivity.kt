@@ -81,6 +81,14 @@ class MainActivity : AppCompatActivity() {
         checkPermissions()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Check if IME was enabled while user was in Settings
+        if (setupSettingItemsDone && isImeEnabled()) {
+            Toast.makeText(this, R.string.ime_enabled_success, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // The onClick event of the grant permission button.
     // Opens up the app settings panel to manually configure permissions.
     fun onRequestMicrophonePermission(view: View) {
