@@ -1,0 +1,44 @@
+name: Check Version Bump
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'android/app/src/main/res/**'
+      - 'android/app/src/main/java/**'
+      - 'android/app/src/main/kotlin/**'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version bump
+        run: |
+          # Get the version from the PR branch
+          NEW_VERSION=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          NEW_CODE=$(grep -oP 'versionCode = \K\d+' android/app/build.gradle.kts)
+          
+          echo "PR version: $NEW_VERSION (code: $NEW_CODE)"
+          
+          # Get the version from the base branch (master)
+          OLD_VERSION=$(git show origin/master:android/app/build.gradle.kts | grep -oP 'versionName = "\K[^"]+')
+          OLD_CODE=$(git show origin/master:android/app/build.gradle.kts | grep -oP 'versionCode = \K\d+')
+          
+          echo "Base version: $OLD_VERSION (code: $OLD_CODE)"
+          
+          # Check if version was bumped
+          if [ "$NEW_VERSION" = "$OLD_VERSION" ] && [ "$NEW_CODE" = "$OLD_CODE" ]; then
+            echo ""
+            echo "❌ Version not bumped!"
+            echo "Please bump version in android/app/build.gradle.kts before merging."
+            echo "Current: $NEW_VERSION (code: $NEW_CODE)"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ Version bumped: $OLD_VERSION → $NEW_VERSION (code: $OLD_CODE → $NEW_CODE)"

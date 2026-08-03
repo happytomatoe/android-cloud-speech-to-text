@@ -23,7 +23,10 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.core.app.ActivityCompat
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -56,6 +59,7 @@ import kotlinx.coroutines.launch
 // 200 and 201 are an arbitrary values, as long as they do not conflict with each other
 private const val MICROPHONE_PERMISSION_REQUEST_CODE = 200
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 201
+const val NOTIFICATION_CHANNEL_ID = "cloud_speech_to_text_channel"
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 val SPEECH_TO_TEXT_BACKEND = stringPreferencesKey("speech-to-text-backend")
 val ENDPOINT = stringPreferencesKey("endpoint")
@@ -73,12 +77,60 @@ val TEST_FILE_PATH = stringPreferencesKey("test-file-path")
 
 class MainActivity : AppCompatActivity() {
     private var setupSettingItemsDone: Boolean = false
+    private var openedImeSettings: Boolean = false
+    private var wasImeEnabledBeforeSettings: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setupSettingItems()
         checkPermissions()
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = getString(R.string.notification_channel_description)
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Only show success toast if we opened IME settings and IME transitioned from disabled to enabled
+        if (openedImeSettings && !wasImeEnabledBeforeSettings && isImeEnabled()) {
+            Toast.makeText(this, R.string.ime_enabled_success, Toast.LENGTH_SHORT).show()
+        }
+        openedImeSettings = false
+        wasImeEnabledBeforeSettings = false
+
+        // Check if notifications are blocked and guide user to Settings
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+                showNotificationsBlockedDialog()
+            }
+        }
+    }
+
+    private fun showNotificationsBlockedDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notification_permission_required))
+            .setMessage("Notifications are required for this app to work. Please enable them in Settings.")
+            .setPositiveButton("Open Settings") { _, _ ->
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                }
+                startActivity(intent)
+            }
+            .setNegativeButton("Not now", null)
+            .show()
     }
 
     // The onClick event of the grant permission button.
@@ -265,39 +317,9 @@ class MainActivity : AppCompatActivity() {
                         // Deal with individual spinner
                         if (parent.id == R.id.spinner_speech_to_text_backend) {
                             val selectedItem = parent.getItemAtPosition(pos)
-                            if (selectedItem == getString(R.string.settings_option_openai_api)) {
-                                val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
-                                endpointEditText.setText(getString(R.string.settings_option_openai_api_default_endpoint))
-                                val modelEditText: EditText = findViewById<EditText>(R.id.field_model)
-                                modelEditText.setText(getString(R.string.settings_option_openai_api_default_model))
-                            } else if (selectedItem == getString(R.string.settings_option_whisper_asr_webservice)) {
+                            if (selectedItem == getString(R.string.settings_option_voxtral)) {
                                 val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
                                 if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_nvidia_nim_default_endpoint)
-                                ) {
-                                    endpointEditText.setText(getString(R.string.settings_option_whisper_asr_webservice_default_endpoint))
-                                }
-                                val modelEditText: EditText = findViewById<EditText>(R.id.field_model)
-                                modelEditText.setText(getString(R.string.settings_option_whisper_asr_webservice_default_model))
-                            } else if (selectedItem == getString(R.string.settings_option_nvidia_nim)) {
-                                val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
-                                if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_whisper_asr_webservice_default_endpoint)
-                                ) {
-                                    endpointEditText.setText(getString(R.string.settings_option_nvidia_nim_default_endpoint))
-                                }
-                                val modelEditText: EditText = findViewById<EditText>(R.id.field_model)
-                                modelEditText.setText(getString(R.string.settings_option_nvidia_nim_default_model))
-                                val languageCodeEditText: EditText = findViewById<EditText>(R.id.field_language_code)
-                                languageCodeEditText.setText(getString(R.string.settings_option_nvidia_nim_default_language))
-                            } else if (selectedItem == getString(R.string.settings_option_voxtral)) {
-                                val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
-                                if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_whisper_asr_webservice_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_nvidia_nim_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_elevenlabs_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_deepgram_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_groq_default_endpoint) ||
@@ -312,9 +334,6 @@ class MainActivity : AppCompatActivity() {
                             } else if (selectedItem == getString(R.string.settings_option_elevenlabs)) {
                                 val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
                                 if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_whisper_asr_webservice_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_nvidia_nim_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_voxtral_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_deepgram_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_groq_default_endpoint) ||
@@ -330,9 +349,6 @@ class MainActivity : AppCompatActivity() {
                             else if (selectedItem == getString(R.string.settings_option_deepgram)) {
                                 val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
                                 if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_whisper_asr_webservice_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_nvidia_nim_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_voxtral_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_elevenlabs_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_groq_default_endpoint) ||
@@ -347,9 +363,6 @@ class MainActivity : AppCompatActivity() {
                             } else if (selectedItem == getString(R.string.settings_option_groq)) {
                                 val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
                                 if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_whisper_asr_webservice_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_nvidia_nim_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_voxtral_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_elevenlabs_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_deepgram_default_endpoint) ||
@@ -364,9 +377,6 @@ class MainActivity : AppCompatActivity() {
                             } else if (selectedItem == getString(R.string.settings_option_60db)) {
                                 val endpointEditText: EditText = findViewById<EditText>(R.id.field_endpoint)
                                 if (endpointEditText.text.isEmpty() ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_openai_api_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_whisper_asr_webservice_default_endpoint) ||
-                                    endpointEditText.text.toString() == getString(R.string.settings_option_nvidia_nim_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_voxtral_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_elevenlabs_default_endpoint) ||
                                     endpointEditText.text.toString() == getString(R.string.settings_option_deepgram_default_endpoint) ||
@@ -382,7 +392,6 @@ class MainActivity : AppCompatActivity() {
                             // Update Create API Key link
                             val createKeyLink = findViewById<TextView>(R.id.link_create_api_key)
                             val providerUrls = mapOf(
-                                getString(R.string.settings_option_openai_api) to "https://platform.openai.com/api-keys",
                                 getString(R.string.settings_option_voxtral) to "https://console.mistral.ai/?profile_dialog=api-keys",
                                 getString(R.string.settings_option_elevenlabs) to "https://elevenlabs.io/app/settings/api-keys",
                                 getString(R.string.settings_option_deepgram) to "https://console.deepgram.com/project/default/settings/api-keys",
@@ -406,8 +415,9 @@ class MainActivity : AppCompatActivity() {
                                 .setTitle(R.string.notification_enable_dialog_title)
                                 .setMessage(R.string.notification_enable_dialog_message)
                                 .setPositiveButton(R.string.notification_enable_dialog_enable) { _, _ ->
-                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    intent.data = Uri.fromParts("package", packageName, null)
+                                    val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                                        .putExtra(Settings.EXTRA_CHANNEL_ID, NOTIFICATION_CHANNEL_ID)
                                     startActivity(intent)
                                 }
                                 .setNegativeButton(R.string.ime_enable_dialog_later, null)
@@ -431,7 +441,6 @@ class MainActivity : AppCompatActivity() {
                 if (preferenceKey == SPEECH_TO_TEXT_BACKEND) {
                     val createKeyLink = findViewById<TextView>(R.id.link_create_api_key)
                     val providerUrls = mapOf(
-                        getString(R.string.settings_option_openai_api) to "https://platform.openai.com/api-keys",
                         getString(R.string.settings_option_voxtral) to "https://console.mistral.ai/?profile_dialog=api-keys",
                         getString(R.string.settings_option_elevenlabs) to "https://elevenlabs.io/app/settings/api-keys",
                         getString(R.string.settings_option_deepgram) to "https://console.deepgram.com/project/default/settings/api-keys",
@@ -467,19 +476,16 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             val settingItems = arrayOf(
                 SettingStringDropdown(R.id.spinner_speech_to_text_backend, SPEECH_TO_TEXT_BACKEND, listOf(
-                    getString(R.string.settings_option_openai_api),
-                    getString(R.string.settings_option_whisper_asr_webservice),
-                    getString(R.string.settings_option_nvidia_nim),
                     getString(R.string.settings_option_voxtral),
                     getString(R.string.settings_option_elevenlabs),
                     getString(R.string.settings_option_deepgram),
                     getString(R.string.settings_option_groq),
                     getString(R.string.settings_option_60db)
-                ), getString(R.string.settings_option_openai_api)),
-                SettingText(R.id.field_endpoint, ENDPOINT, getString(R.string.settings_option_openai_api_default_endpoint)),
-                SettingText(R.id.field_language_code, LANGUAGE_CODE, getString(R.string.settings_option_openai_api_default_language)),
+                ), getString(R.string.settings_option_voxtral)),
+                SettingText(R.id.field_endpoint, ENDPOINT, getString(R.string.settings_option_voxtral_default_endpoint)),
+                SettingText(R.id.field_language_code, LANGUAGE_CODE, getString(R.string.settings_option_voxtral_default_language)),
                 SettingText(R.id.field_api_key, API_KEY),
-                SettingText(R.id.field_model, MODEL, getString(R.string.settings_option_openai_api_default_model)),
+                SettingText(R.id.field_model, MODEL, getString(R.string.settings_option_voxtral_default_model)),
                 SettingDropdown(R.id.spinner_auto_recording_start, AUTO_RECORDING_START, hashMapOf(
                     getString(R.string.settings_option_yes) to true,
                     getString(R.string.settings_option_no) to false,
@@ -512,10 +518,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 Toast.makeText(this@MainActivity, R.string.successfully_set, Toast.LENGTH_SHORT).show()
                 if (!isImeEnabled()) {
+                    wasImeEnabledBeforeSettings = false
                     androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
                         .setTitle(R.string.ime_enable_dialog_title)
                         .setMessage(R.string.ime_enable_dialog_message)
                         .setPositiveButton(R.string.ime_enable_dialog_enable) { _, _ ->
+                            openedImeSettings = true
                             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                         }
                         .setNegativeButton(R.string.ime_enable_dialog_later, null)
@@ -530,8 +538,10 @@ class MainActivity : AppCompatActivity() {
     private fun isImeEnabled(): Boolean {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         val enabledImes = imm.enabledInputMethodList
-        val imeId = "${packageName}/${WhisperInputService::class.java.canonicalName}"
-        return enabledImes.any { it.id == imeId }
+        val imeComponent = ComponentName(packageName, WhisperInputService::class.java.name)
+        val imeShort = imeComponent.flattenToShortString()
+        val imeLong = imeComponent.flattenToString()
+        return enabledImes.any { it.id == imeShort || it.id == imeLong }
     }
 
     private fun isNotificationPermissionGranted(): Boolean {

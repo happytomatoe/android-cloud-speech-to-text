@@ -65,7 +65,7 @@ class WhisperTranscriber {
                 Config(
                     preferences[ENDPOINT] ?: "",
                     preferences[LANGUAGE_CODE] ?: "",
-                    preferences[SPEECH_TO_TEXT_BACKEND] ?: context.getString(R.string.settings_option_openai_api),
+                    preferences[SPEECH_TO_TEXT_BACKEND] ?: context.getString(R.string.settings_option_voxtral),
                     preferences[MODEL] ?: "",
                     preferences[POSTPROCESSING] ?: context.getString(R.string.settings_option_no_conversion),
                     preferences[ADD_TRAILING_SPACE] ?: false
@@ -147,13 +147,6 @@ class WhisperTranscriber {
                 } catch (e: JSONException) {
                     // If not JSON, use as-is
                 }
-            }
-            
-            // For NVIDIA NIM, remove quotes if they wrap the text
-            // Not sure if this is a bug or a feature...
-            if (speechToTextBackend == context.getString(R.string.settings_option_nvidia_nim) && 
-                rawText.startsWith("\"") && rawText.endsWith("\"")) {
-                rawText = rawText.substring(1, rawText.length - 1).trim()
             }
             
             val processedText = when (postprocessing) {
@@ -252,29 +245,16 @@ class WhisperTranscriber {
 
             // File field
             when (speechToTextBackend) {
-                context.getString(R.string.settings_option_openai_api),
-                context.getString(R.string.settings_option_nvidia_nim),
                 context.getString(R.string.settings_option_voxtral),
                 context.getString(R.string.settings_option_elevenlabs),
                 context.getString(R.string.settings_option_groq),
                 context.getString(R.string.settings_option_60db) -> {
                     addFormDataPart("file", formDataFilename, fileBody)
                 }
-                context.getString(R.string.settings_option_whisper_asr_webservice) -> {
-                    addFormDataPart("audio_file", formDataFilename, fileBody)
-                }
             }
 
             // Provider-specific parameters
             when (speechToTextBackend) {
-                context.getString(R.string.settings_option_openai_api) -> {
-                    addFormDataPart("model", model)
-                    addFormDataPart("response_format", "text")
-                }
-                context.getString(R.string.settings_option_nvidia_nim) -> {
-                    addFormDataPart("language", languageCode)
-                    addFormDataPart("response_format", "text")
-                }
                 context.getString(R.string.settings_option_voxtral) -> {
                     addFormDataPart("model", model)
                     if (languageCode != "auto" && languageCode.isNotEmpty()) {
@@ -302,7 +282,6 @@ class WhisperTranscriber {
         // Headers - NO manual Content-Type (OkHttp adds boundary)
         val requestHeaders: Headers = Headers.Builder().apply {
             when (speechToTextBackend) {
-                context.getString(R.string.settings_option_openai_api),
                 context.getString(R.string.settings_option_voxtral),
                 context.getString(R.string.settings_option_groq),
                 context.getString(R.string.settings_option_60db) -> {
@@ -322,11 +301,7 @@ class WhisperTranscriber {
 
         // URL building - FIXED: separate OpenAI from Whisper ASR Webservice
         val url = when (speechToTextBackend) {
-            context.getString(R.string.settings_option_whisper_asr_webservice) -> {
-                // Whisper ASR Webservice uses query params
-                "$endpoint?encode=true&task=transcribe&language=$languageCode&word_timestamps=false&output=txt"
-            }
-            else -> endpoint  // OpenAI, NVIDIA NIM, Voxtral, ElevenLabs use direct endpoint
+            else -> endpoint  // Voxtral, ElevenLabs, Deepgram, Groq, 60db use direct endpoint
         }
 
         return Request.Builder()
